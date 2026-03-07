@@ -10,6 +10,9 @@ from pathlib import Path
 # .env 파일 로드
 load_dotenv()
 
+# 로그 디렉토리 자동 생성
+os.makedirs('logs', exist_ok=True)
+
 # 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
