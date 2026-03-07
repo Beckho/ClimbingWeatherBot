@@ -1,0 +1,62 @@
+# 환경
+.env
+.env.local
+.env.*.local
+
+# 가상환경
+venv/
+ENV/
+env/
+.venv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 로그
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 테스트
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 캐시
+.cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# 기타
+*.tmp
+temp/
