@@ -4,7 +4,6 @@
 텔레그램 메시지로 전송합니다.
 """
 import sys
-import os
 from pathlib import Path
 
 # Windows asyncio 정책 설정 (필수)
@@ -36,12 +35,6 @@ def main():
     logger.info("=" * 50)
     logger.info("클라이밍 날씨 TGTWTG 봇 시작")
     logger.info("=" * 50)
-    
-    # 환경 변수 확인
-    if not os.path.exists('.env'):
-        logger.error(".env 파일을 찾을 수 없습니다.")
-        logger.error(".env.example 파일을 .env로 복사하고 설정을 입력하세요.")
-        return False
     
     # 설정 유효성 확인
     if not Config.validate():

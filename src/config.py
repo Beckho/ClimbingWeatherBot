@@ -41,7 +41,10 @@ class Config:
     SCHEDULE_MINUTE = int(os.getenv('SCHEDULE_MINUTE', 0))
     
     # Sites config
-    CLIMBING_SITES_CONFIG = os.getenv('CLIMBING_SITES_CONFIG', 'config/sites.json')
+    CLIMBING_SITES_CONFIG = os.getenv(
+        'CLIMBING_SITES_CONFIG',
+        str(Path(__file__).parent.parent / 'config' / 'sites.json')
+    )
     
     @staticmethod
     def load_sites():
