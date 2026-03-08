@@ -305,15 +305,19 @@ class ClimbingWeatherBot:
         """모든 지역 주말 예보를 표 형식으로 포맷팅"""
         try:
             import pytz
-            from datetime import datetime
-            
+            from datetime import datetime, timedelta
+
             # 데이터 수집
             saturday_date = None
             sunday_date = None
             saturday_data = {}
             sunday_data = {}
-            data_source = None  # 데이터 소스 저장
-            
+            next_saturday_data = {}
+            next_sunday_data = {}
+            data_source = None
+            announced_at = None
+            has_next_weekend = False
+
             seoul_tz = pytz.timezone('Asia/Seoul')
             
             # 날씨 설명을 아이콘으로 변환하는 함수
@@ -342,15 +346,22 @@ class ClimbingWeatherBot:
             for site_name, forecast in all_forecasts.items():
                 if not forecast:
                     continue
-                
-                # 새로운 구조: forecast는 {'source': ..., 'saturday': [], 'sunday': [], 'current': ...}
+
                 source = forecast.get('source', 'unknown')
                 if data_source is None:
                     data_source = source
-                
+
+                if announced_at is None:
+                    announced_at = forecast.get('announced_at')
+
+                if 'next_saturday' in forecast or 'next_sunday' in forecast:
+                    has_next_weekend = True
+
                 saturday = forecast.get('saturday', [])
                 sunday = forecast.get('sunday', [])
-                
+                next_saturday = forecast.get('next_saturday', [])
+                next_sunday = forecast.get('next_sunday', [])
+
                 # 토요일 첫 번째 아이템에서 날짜 추출
                 if saturday and not saturday_date:
                     ts = saturday[0].get('timestamp', '')
@@ -358,7 +369,7 @@ class ClimbingWeatherBot:
                         saturday_date = datetime.fromisoformat(ts).astimezone(seoul_tz).date()
                     except:
                         pass
-                
+
                 # 일요일 첫 번째 아이템에서 날짜 추출
                 if sunday and not sunday_date:
                     ts = sunday[0].get('timestamp', '')
@@ -366,74 +377,89 @@ class ClimbingWeatherBot:
                         sunday_date = datetime.fromisoformat(ts).astimezone(seoul_tz).date()
                     except:
                         pass
-                
+
                 # 지역별 데이터 저장 (최저/최고 온도, 평균 바람(m/s), 날씨 아이콘)
                 if saturday:
                     min_temp = min(item.get('temp_min', float('inf')) for item in saturday)
                     max_temp = max(item.get('temp_max', float('-inf')) for item in saturday)
                     avg_wind = sum(item.get('wind_speed', 0) for item in saturday) / len(saturday)
-                    # 가장 많이 나타나는 날씨 설명 선택
                     descriptions = [item.get('description', '') for item in saturday]
-                    weather = descriptions[0] if descriptions else ''
-                    weather_icon = get_weather_icon(weather)
-                    
+                    weather_icon = get_weather_icon(descriptions[0] if descriptions else '')
                     saturday_data[site_name] = (f"{min_temp:.0f}", f"{max_temp:.0f}", f"{avg_wind:.1f}", weather_icon)
-                
+
                 if sunday:
                     min_temp = min(item.get('temp_min', float('inf')) for item in sunday)
                     max_temp = max(item.get('temp_max', float('-inf')) for item in sunday)
                     avg_wind = sum(item.get('wind_speed', 0) for item in sunday) / len(sunday)
                     descriptions = [item.get('description', '') for item in sunday]
-                    weather = descriptions[0] if descriptions else ''
-                    weather_icon = get_weather_icon(weather)
-                    
+                    weather_icon = get_weather_icon(descriptions[0] if descriptions else '')
                     sunday_data[site_name] = (f"{min_temp:.0f}", f"{max_temp:.0f}", f"{avg_wind:.1f}", weather_icon)
+
+                if next_saturday:
+                    min_temp = min(item.get('temp_min', float('inf')) for item in next_saturday)
+                    max_temp = max(item.get('temp_max', float('-inf')) for item in next_saturday)
+                    avg_wind = sum(item.get('wind_speed', 0) for item in next_saturday) / len(next_saturday)
+                    descriptions = [item.get('description', '') for item in next_saturday]
+                    weather_icon = get_weather_icon(descriptions[0] if descriptions else '')
+                    next_saturday_data[site_name] = (f"{min_temp:.0f}", f"{max_temp:.0f}", f"{avg_wind:.1f}", weather_icon)
+
+                if next_sunday:
+                    min_temp = min(item.get('temp_min', float('inf')) for item in next_sunday)
+                    max_temp = max(item.get('temp_max', float('-inf')) for item in next_sunday)
+                    avg_wind = sum(item.get('wind_speed', 0) for item in next_sunday) / len(next_sunday)
+                    descriptions = [item.get('description', '') for item in next_sunday]
+                    weather_icon = get_weather_icon(descriptions[0] if descriptions else '')
+                    next_sunday_data[site_name] = (f"{min_temp:.0f}", f"{max_temp:.0f}", f"{avg_wind:.1f}", weather_icon)
             
             # 데이터가 없으면 None 반환
             if not saturday_data and not sunday_data:
                 return None
-            
+
             # 소스 표시
             source_emoji = '🔵 기상청(KMA)' if data_source == 'kma' else '🟢 OpenWeather'
-            
+            announced_str = f" | {announced_at} 발표" if announced_at else ""
+
             # 메시지 구성
-            message = f"🗓️ *[ 주말 날씨 예보 ]* ({source_emoji})\n"
+            message = f"🗓️ *[ 주말 날씨 예보 ]* ({source_emoji}{announced_str})\n"
             message += "최저/최고 온도 & 평균 풍속 (5일 이내)\n"
             message += "=" * 60 + "\n\n"
-            
-            # 토요일
-            sat_date_str = saturday_date.strftime("%m-%d (토)") if saturday_date else "(토)"
-            message += f"*📅 토요일 - {sat_date_str}*\n"
-            message += "```\n"
-            message += f"{'지역':<15} {'온도':<12} {'풍속':<10} {''}     \n"
-            message += "-" * 50 + "\n"
-            
-            for site_name in sorted(saturday_data.keys()):
-                min_t, max_t, wind, icon = saturday_data[site_name]
-                message += f"{site_name:<15} {min_t}~{max_t}°C    {wind}m/s  {icon}\n"
-            
-            if saturday_data:
-                message += "```\n\n"
-            else:
-                message += "데이터 없음\n```\n\n"
-            
-            # 일요일
-            sun_date_str = sunday_date.strftime("%m-%d (일)") if sunday_date else "(일)"
-            message += f"*📅 일요일 - {sun_date_str}*\n"
-            message += "```\n"
-            message += f"{'지역':<15} {'온도':<12} {'풍속':<10} {''}     \n"
-            message += "-" * 50 + "\n"
-            
-            for site_name in sorted(sunday_data.keys()):
-                min_t, max_t, wind, icon = sunday_data[site_name]
-                message += f"{site_name:<15} {min_t}~{max_t}°C    {wind}m/s  {icon}\n"
-            
-            if sunday_data:
-                message += "```"
-            else:
-                message += "데이터 없음\n```"
-            
-            return message
+
+            def format_weekend_section(date_obj, date_suffix, data_dict):
+                date_str = date_obj.strftime(f"%m-%d ({date_suffix})") if date_obj else f"({date_suffix})"
+                sec = f"*📅 {date_str}*\n"
+                sec += "```\n"
+                sec += f"{'지역':<15} {'온도':<12} {'풍속':<10}\n"
+                sec += "-" * 40 + "\n"
+                if data_dict:
+                    for sname in sorted(data_dict.keys()):
+                        min_t, max_t, wind, icon = data_dict[sname]
+                        sec += f"{sname:<15} {min_t}~{max_t}°C    {wind}m/s  {icon}\n"
+                else:
+                    sec += "데이터 없음 (예보 범위 초과)\n"
+                sec += "```\n\n"
+                return sec
+
+            # 이번 주 토/일
+            message += format_weekend_section(saturday_date, "토", saturday_data)
+            message += format_weekend_section(sunday_date, "일", sunday_data)
+
+            # 다음 주 토/일 (오늘이 주말인 경우)
+            if has_next_weekend:
+                today = datetime.now(seoul_tz).date()
+                next_sat_date = None
+                next_sun_date = None
+                for i in range(5, 14):
+                    check_date = today + timedelta(days=i)
+                    if check_date.weekday() == 5 and next_sat_date is None:
+                        next_sat_date = check_date
+                    elif check_date.weekday() == 6 and next_sun_date is None:
+                        next_sun_date = check_date
+
+                message += "*[ 다음 주 주말 ]*\n"
+                message += format_weekend_section(next_sat_date, "토", next_saturday_data)
+                message += format_weekend_section(next_sun_date, "일", next_sunday_data)
+
+            return message.rstrip()
         except Exception as e:
             logger.error(f"[주말 포맷] 통합 포맷팅 오류: {e}", exc_info=True)
             return None

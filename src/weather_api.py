@@ -154,11 +154,13 @@ class WeatherAPI:
 
                     if result_code == '00':
                         logger.info(f"[KMA] 초단기예보 조회 성공: {fcst_date} {fcst_time}")
+                        announced_at = f"{fcst_date[:4]}-{fcst_date[4:6]}-{fcst_date[6:8]} {fcst_time[:2]}:{fcst_time[2:]}"
 
                         return {
                             'source': 'KMA',
                             'current': self._parse_kma_current(short_data),
-                            'forecast': self._parse_kma_forecast(short_data)
+                            'forecast': self._parse_kma_forecast(short_data),
+                            'announced_at': announced_at
                         }
                     else:
                         logger.warning(f"[KMA] 시도 {fcst_date} {fcst_time}: code={result_code} msg={result_msg}")
@@ -448,59 +450,73 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     # 한국 시간대 기준으로 토요일과 일요일의 예보만 필터링
     seoul_tz = pytz.timezone('Asia/Seoul')
     today = datetime.now(seoul_tz).date()
-    
-    # 5일 예보 범위: 오늘 ~ 오늘 + 4일
-    forecast_end_date = today + timedelta(days=4)
-    
-    # 오늘부터 다음 4일 사이에 토요일/일요일이 있는지 찾기
+
+    # 오늘이 주말(토/일)이면 다음 주 주말도 표시
+    today_weekday = today.weekday()
+    is_weekend_today = today_weekday in (5, 6)
+
+    # 이번 주 주말 날짜 찾기 (5일 범위)
     saturday = None
     sunday = None
-    
     for i in range(5):
         check_date = today + timedelta(days=i)
-        if check_date.weekday() == 5:  # 토요일
+        if check_date.weekday() == 5 and saturday is None:
             saturday = check_date
-        elif check_date.weekday() == 6:  # 일요일
+        elif check_date.weekday() == 6 and sunday is None:
             sunday = check_date
-    
+
+    # 다음 주 주말 날짜 찾기 (오늘이 주말인 경우)
+    next_saturday = None
+    next_sunday = None
+    if is_weekend_today:
+        for i in range(5, 14):
+            check_date = today + timedelta(days=i)
+            if check_date.weekday() == 5 and next_saturday is None:
+                next_saturday = check_date
+            elif check_date.weekday() == 6 and next_sunday is None:
+                next_sunday = check_date
+
     logger.info(f"[주말 예보] 오늘: {today} ({['월', '화', '수', '목', '금', '토', '일'][today.weekday()]})")
-    logger.info(f"[주말 예보] 예보 범위: {today} ~ {forecast_end_date}")
-    
-    if saturday:
-        logger.info(f"[주말 예보] 토요일: {saturday}")
-    else:
-        logger.info("[주말 예보] 5일 범위 내 토요일 없음")
-    
-    if sunday:
-        logger.info(f"[주말 예보] 일요일: {sunday}")
-    else:
-        logger.info("[주말 예보] 5일 범위 내 일요일 없음")
-    
+    logger.info(f"[주말 예보] 이번 주말: 토={saturday}, 일={sunday}")
+    if is_weekend_today:
+        logger.info(f"[주말 예보] 다음 주말: 토={next_saturday}, 일={next_sunday}")
+
     # 선택된 데이터 소스에서 주말 데이터 필터링
+    announced_at = forecast_data.get('announced_at') if data_source == 'kma' else None
+
     weekend_forecast = {
         'source': data_source,
         'saturday': [],
         'sunday': [],
-        'current': forecast_data.get('current')
+        'current': forecast_data.get('current'),
+        'announced_at': announced_at
     }
-    
+
+    if is_weekend_today:
+        weekend_forecast['next_saturday'] = []
+        weekend_forecast['next_sunday'] = []
+
     forecast_list = forecast_data.get('forecast', [])
     logger.info(f"[주말 예보] {data_source}에서 {len(forecast_list)}개의 예보 데이터 수신")
-    
+
     for forecast in forecast_list:
         try:
             forecast_timestamp = forecast.get('timestamp', '')
             forecast_date = datetime.fromisoformat(forecast_timestamp).astimezone(seoul_tz).date()
-            
+
             if saturday and forecast_date == saturday:
                 weekend_forecast['saturday'].append(forecast)
                 logger.debug(f"[주말 예보] 토요일 데이터: {forecast_timestamp}")
             elif sunday and forecast_date == sunday:
                 weekend_forecast['sunday'].append(forecast)
                 logger.debug(f"[주말 예보] 일요일 데이터: {forecast_timestamp}")
+            elif is_weekend_today and next_saturday and forecast_date == next_saturday:
+                weekend_forecast['next_saturday'].append(forecast)
+            elif is_weekend_today and next_sunday and forecast_date == next_sunday:
+                weekend_forecast['next_sunday'].append(forecast)
         except Exception as e:
             logger.warning(f"[주말 예보] 타임스탬프 파싱 오류: {e}, {forecast}")
-    
+
     sat_count = len(weekend_forecast['saturday'])
     sun_count = len(weekend_forecast['sunday'])
     logger.info(f"[주말 예보] {data_source}: 토요일 {sat_count}개, 일요일 {sun_count}개 데이터 필터링됨")

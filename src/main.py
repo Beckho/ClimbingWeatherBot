@@ -74,7 +74,7 @@ def main():
 
         async def post_init(application):
             # 스케줄러 시작
-            scheduler = WeatherScheduler(application.bot)
+            scheduler = WeatherScheduler(bot)
             scheduler.add_morning_report(Config.SCHEDULE_HOUR, Config.SCHEDULE_MINUTE)
             scheduler.add_cache_refresh(sites, Config.OPENWEATHER_API_KEY, Config.KMA_API_KEY)
             scheduler.start()
