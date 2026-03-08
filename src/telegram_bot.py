@@ -31,8 +31,9 @@ class ClimbingWeatherBot:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """시작 명령어"""
         user = update.effective_user
-        logger.info(f"사용자 시작: {user.id} - {user.username}")
-        
+        chat_id = update.effective_chat.id
+        logger.info(f"사용자 시작: {user.id} - {user.username} (chat_id={chat_id})")
+
         welcome_message = """
 안녕하세요! 🏔️ *클라이밍 날씨 TGTWTG 봇*입니다.
 
@@ -48,6 +49,30 @@ class ClimbingWeatherBot:
 
         """
         await update.message.reply_text(welcome_message, parse_mode='Markdown')
+
+        # 관리자(첫 번째 TELEGRAM_CHAT_ID)에게 새 사용자 알림
+        admin_ids = [cid.strip() for cid in Config.TELEGRAM_CHAT_ID.split(',') if cid.strip()]
+        if admin_ids:
+            admin_id = admin_ids[0]
+            if str(chat_id) != admin_id:
+                try:
+                    username_str = f"@{user.username}" if user.username else "(없음)"
+                    name_str = user.full_name or user.first_name or "?"
+                    notify_msg = (
+                        f"🔔 *새 사용자가 봇을 시작했습니다*\n\n"
+                        f"이름: {name_str}\n"
+                        f"유저명: {username_str}\n"
+                        f"Chat ID: `{chat_id}`\n\n"
+                        f"구독 추가 시 TELEGRAM\\_CHAT\\_ID에 이 Chat ID를 추가하세요."
+                    )
+                    await context.bot.send_message(
+                        chat_id=admin_id,
+                        text=notify_msg,
+                        parse_mode='Markdown'
+                    )
+                    logger.info(f"관리자({admin_id})에게 새 사용자 알림 전송 완료")
+                except Exception as e:
+                    logger.error(f"관리자 알림 전송 실패: {e}")
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """도움말"""
@@ -380,37 +405,22 @@ class ClimbingWeatherBot:
                         pass
 
                 # 지역별 데이터 저장 (최저/최고 온도, 평균 바람(m/s), 날씨 아이콘)
+                def summarize(items):
+                    min_temp = min(item.get('temp_min', float('inf')) for item in items)
+                    max_temp = max(item.get('temp_max', float('-inf')) for item in items)
+                    avg_wind = sum(item.get('wind_speed', 0) for item in items) / len(items)
+                    descriptions = [item.get('description', '') for item in items]
+                    icon = get_weather_icon(descriptions[0] if descriptions else '')
+                    return (f"{min_temp:.0f}", f"{max_temp:.0f}", avg_wind, icon)
+
                 if saturday:
-                    min_temp = min(item.get('temp_min', float('inf')) for item in saturday)
-                    max_temp = max(item.get('temp_max', float('-inf')) for item in saturday)
-                    avg_wind = sum(item.get('wind_speed', 0) for item in saturday) / len(saturday)
-                    descriptions = [item.get('description', '') for item in saturday]
-                    weather_icon = get_weather_icon(descriptions[0] if descriptions else '')
-                    saturday_data[site_name] = (f"{min_temp:.0f}", f"{max_temp:.0f}", f"{avg_wind:.1f}", weather_icon)
-
+                    saturday_data[site_name] = summarize(saturday)
                 if sunday:
-                    min_temp = min(item.get('temp_min', float('inf')) for item in sunday)
-                    max_temp = max(item.get('temp_max', float('-inf')) for item in sunday)
-                    avg_wind = sum(item.get('wind_speed', 0) for item in sunday) / len(sunday)
-                    descriptions = [item.get('description', '') for item in sunday]
-                    weather_icon = get_weather_icon(descriptions[0] if descriptions else '')
-                    sunday_data[site_name] = (f"{min_temp:.0f}", f"{max_temp:.0f}", f"{avg_wind:.1f}", weather_icon)
-
+                    sunday_data[site_name] = summarize(sunday)
                 if next_saturday:
-                    min_temp = min(item.get('temp_min', float('inf')) for item in next_saturday)
-                    max_temp = max(item.get('temp_max', float('-inf')) for item in next_saturday)
-                    avg_wind = sum(item.get('wind_speed', 0) for item in next_saturday) / len(next_saturday)
-                    descriptions = [item.get('description', '') for item in next_saturday]
-                    weather_icon = get_weather_icon(descriptions[0] if descriptions else '')
-                    next_saturday_data[site_name] = (f"{min_temp:.0f}", f"{max_temp:.0f}", f"{avg_wind:.1f}", weather_icon)
-
+                    next_saturday_data[site_name] = summarize(next_saturday)
                 if next_sunday:
-                    min_temp = min(item.get('temp_min', float('inf')) for item in next_sunday)
-                    max_temp = max(item.get('temp_max', float('-inf')) for item in next_sunday)
-                    avg_wind = sum(item.get('wind_speed', 0) for item in next_sunday) / len(next_sunday)
-                    descriptions = [item.get('description', '') for item in next_sunday]
-                    weather_icon = get_weather_icon(descriptions[0] if descriptions else '')
-                    next_sunday_data[site_name] = (f"{min_temp:.0f}", f"{max_temp:.0f}", f"{avg_wind:.1f}", weather_icon)
+                    next_sunday_data[site_name] = summarize(next_sunday)
             
             # 데이터가 없으면 None 반환
             if not saturday_data and not sunday_data:
@@ -434,7 +444,8 @@ class ClimbingWeatherBot:
                 if data_dict:
                     for sname in sorted(data_dict.keys()):
                         min_t, max_t, wind, icon = data_dict[sname]
-                        sec += f"{sname:<15} {min_t}~{max_t}°C    {wind}m/s  {icon}\n"
+                        wind_str = "--" if wind == 0.0 else f"{wind:.1f}m/s"
+                        sec += f"{sname:<15} {min_t}~{max_t}°C    {wind_str:<10} {icon}\n"
                 else:
                     sec += "데이터 없음 (예보 범위 초과)\n"
                 sec += "```\n\n"
@@ -468,18 +479,50 @@ class ClimbingWeatherBot:
     async def send_morning_report(self) -> None:
         """매일 아침 자동 리포트 발송"""
         logger.info("아침 날씨 리포트 발송 중...")
-        
+
+        chat_ids = [cid.strip() for cid in Config.TELEGRAM_CHAT_ID.split(',') if cid.strip()]
+        if not chat_ids:
+            logger.warning("TELEGRAM_CHAT_ID가 설정되지 않아 아침 리포트를 발송하지 않습니다.")
+            return
+
         try:
-            for site_name, site in self.sites.items():
-                forecast = self._get_site_weather(
-                    site_name,
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+
+            def fetch(site_name, site):
+                return site_name, get_weekend_forecast(
                     site['latitude'],
-                    site['longitude']
+                    site['longitude'],
+                    Config.OPENWEATHER_API_KEY,
+                    Config.KMA_API_KEY,
+                    site.get('region')
                 )
-                
-                if forecast:
-                    # 실제 구현에서는 저장된 chat_id로 메시지 발송
-                    logger.info(f"리포트: {site_name}")
+
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as executor:
+                tasks = [
+                    loop.run_in_executor(executor, fetch, name, site)
+                    for name, site in self.sites.items()
+                ]
+                results = await asyncio.gather(*tasks)
+
+            all_forecasts = {name: forecast for name, forecast in results}
+            message = self._format_all_weekend_forecasts(all_forecasts)
+
+            if not message:
+                logger.warning("아침 리포트: 메시지 생성 실패")
+                return
+
+            for chat_id in chat_ids:
+                try:
+                    await self.application.bot.send_message(
+                        chat_id=chat_id,
+                        text=message,
+                        parse_mode='Markdown'
+                    )
+                    logger.info(f"아침 리포트 발송 완료: {chat_id}")
+                except Exception as e:
+                    logger.error(f"아침 리포트 발송 실패 ({chat_id}): {e}")
         except Exception as e:
             logger.error(f"아침 리포트 발송 오류: {e}")
     
