@@ -3,10 +3,11 @@
 메시지 수신 및 날씨 알림 발송
 """
 import logging
+import unicodedata
 from typing import Optional, Dict
 from telegram import Update, User
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, 
+    Application, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler
 )
 from datetime import datetime
@@ -95,21 +96,13 @@ class ClimbingWeatherBot:
 🏔️ **모니터링 지역 (13개)**
 
 *스포츠 클라이밍 (7개)*
-• 간현 (강원도 원주)
-• 조비산 (경기도 용인)
-• 선운산 (전라북도 고창)
-• 삼성산 (경기도 안양)
-• 삼천바위 (전라북도 완주)
-• 연경도약대 (대구 북구)
-• 새벽암장 (경기도 파주)
+• 간현(원주) • 조비산(용인) • 선운산(고창)
+• 삼성산(안양) • 삼천바위(완주)
+• 연경(대구) • 새벽암장(파주)
 
 *볼더링 (6개)*
-• 운일암 반일암 (전라북도 진안)
-• 무등산 (광주)
-• 북한산 (서울)
-• 불암산 (서울/남양주)
-• 감자바위 (경기도 안양)
-• 을왕리 (인천)
+• 진안(진안) • 무등산(광주) • 북한산(서울)
+• 불암산(노원) • 감자바위(안양) • 을왕리(인천)
 
 💬 **자연스러운 말로도 사용 가능:**
 "간현 날씨 어때?", "주말은?", "지역 뭐가 있어?" 등
@@ -440,17 +433,40 @@ class ClimbingWeatherBot:
             message += "최저/최고 온도 & 평균 풍속 (5일 이내)\n"
             message += "=" * 60 + "\n\n"
 
+            def dw(s):
+                """한국어 포함 문자열의 표시 너비 계산 (CJK=2, 기타=1)"""
+                w = 0
+                for c in s:
+                    ea = unicodedata.east_asian_width(c)
+                    w += 2 if ea in ('W', 'F') else 1
+                return w
+
+            def ljust_dw(s, width):
+                """표시 너비 기준으로 왼쪽 정렬"""
+                return s + ' ' * max(0, width - dw(s))
+
             def format_weekend_section(date_obj, date_suffix, data_dict):
                 date_str = date_obj.strftime(f"%m-%d ({date_suffix})") if date_obj else f"({date_suffix})"
                 sec = f"*📅 {date_str}*\n"
                 sec += "```\n"
-                sec += f"{'지역':<12} {'온도':<10} 풍속\n"
-                sec += "-" * 35 + "\n"
+                COL_NAME = 15  # 삼천바위(완주)(표시너비 14) + 여백 1
+                COL_TEMP = 9   # 최대 -5~-2°C (8자)
+                COL_WIND = 8   # 최대 10.5m/s (7자)
+                sec += ljust_dw("지역", COL_NAME) + ljust_dw("온도", COL_TEMP) + ljust_dw("풍속", COL_WIND) + "★\n"
+                sec += "-" * (COL_NAME + COL_TEMP + COL_WIND + 2) + "\n"
                 if data_dict:
                     for sname in sorted(data_dict.keys()):
-                        min_t, max_t, wind, icon = data_dict[sname]
+                        min_t, max_t, wind, _ = data_dict[sname]
                         wind_str = "--" if wind == 0.0 else f"{wind:.1f}m/s"
-                        sec += f"{sname:<12} {min_t}~{max_t}°C {wind_str} {icon}\n"
+                        try:
+                            avg_temp = (float(min_t) + float(max_t)) / 2
+                            wd_data = {'temp': avg_temp, 'wind_speed': wind * 3.6}
+                            _, rating, _ = WeatherAnalyzer.calculate_suitability(wd_data)
+                            suit_emoji = WeatherAnalyzer.get_rating_emoji(rating)
+                        except Exception:
+                            suit_emoji = "❓"
+                        temp_str = f"{min_t}~{max_t}°C"
+                        sec += ljust_dw(sname, COL_NAME) + ljust_dw(temp_str, COL_TEMP) + ljust_dw(wind_str, COL_WIND) + suit_emoji + "\n"
                 else:
                     sec += "데이터 없음 (예보 범위 초과)\n"
                 sec += "```\n\n"

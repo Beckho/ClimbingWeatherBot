@@ -1,91 +1,91 @@
 {
   "sites": [
     {
-      "name": "간현",
+      "name": "간현(원주)",
       "latitude": 37.3667,
       "longitude": 128.4833,
       "region": "강원도",
       "type": "스포츠 클라이밍"
     },
     {
-      "name": "조비산",
+      "name": "조비산(용인)",
       "latitude": 37.2333,
       "longitude": 127.0667,
       "region": "경기도",
       "type": "스포츠 클라이밍"
     },
     {
-      "name": "선운산",
+      "name": "선운산(고창)",
       "latitude": 35.4833,
       "longitude": 126.5833,
       "region": "전라북도",
       "type": "스포츠 클라이밍"
     },
     {
-      "name": "삼성산",
+      "name": "삼성산(안양)",
       "latitude": 37.2833,
       "longitude": 126.9833,
       "region": "경기도",
       "type": "스포츠 클라이밍"
     },
     {
-      "name": "삼천바위",
+      "name": "삼천바위(완주)",
       "latitude": 35.8333,
       "longitude": 127.1833,
       "region": "전라북도",
       "type": "스포츠 클라이밍"
     },
     {
-      "name": "연경도약대",
+      "name": "연경(대구)",
       "latitude": 35.9333,
       "longitude": 128.6667,
       "region": "대구",
       "type": "스포츠 클라이밍"
     },
     {
-      "name": "새벽암장",
+      "name": "새벽암장(파주)",
       "latitude": 37.7667,
       "longitude": 126.8,
       "region": "경기도",
       "type": "스포츠 클라이밍"
     },
     {
-      "name": "운일암 반일암",
+      "name": "진안(진안)",
       "latitude": 35.8,
       "longitude": 127.2833,
       "region": "전라북도",
       "type": "볼더링"
     },
     {
-      "name": "무등산",
+      "name": "무등산(광주)",
       "latitude": 35.1333,
       "longitude": 126.9333,
       "region": "광주",
       "type": "볼더링"
     },
     {
-      "name": "북한산",
+      "name": "북한산(서울)",
       "latitude": 37.6524,
       "longitude": 126.9753,
       "region": "서울",
       "type": "볼더링"
     },
     {
-      "name": "불암산",
+      "name": "불암산(노원)",
       "latitude": 37.6667,
       "longitude": 127.0833,
       "region": "서울",
       "type": "볼더링"
     },
     {
-      "name": "감자바위",
+      "name": "감자바위(안양)",
       "latitude": 37.3167,
       "longitude": 126.95,
       "region": "경기도",
       "type": "볼더링"
     },
     {
-      "name": "을왕리",
+      "name": "을왕리(인천)",
       "latitude": 37.4167,
       "longitude": 126.4167,
       "region": "인천",
