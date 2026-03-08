@@ -17,6 +17,20 @@ class WeatherScheduler:
         self.bot = bot
         self.scheduler = AsyncIOScheduler()
     
+    def add_cache_refresh(self, sites: list, openweather_key: str, kma_key: str = None) -> None:
+        """30분마다 캐시 갱신 스케줄 추가"""
+        from weather_api import refresh_all_sites_cache
+        self.scheduler.add_job(
+            refresh_all_sites_cache,
+            trigger='interval',
+            minutes=30,
+            args=[sites, openweather_key, kma_key],
+            id='cache_refresh',
+            name='날씨 캐시 30분 갱신',
+            replace_existing=True
+        )
+        logger.info("캐시 갱신 스케줄 설정: 30분마다")
+
     def add_morning_report(self, hour: int = 7, minute: int = 0) -> None:
         """아침 날씨 리포트 스케줄 추가"""
         self.scheduler.add_job(

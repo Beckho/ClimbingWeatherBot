@@ -21,6 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Config
 from telegram_bot import ClimbingWeatherBot
+from scheduler import WeatherScheduler
+from weather_api import refresh_all_sites_cache
 
 # 로깅 설정
 logging.basicConfig(
@@ -67,10 +69,29 @@ def main():
         logger.info("텔레그램에서 봇과 대화를 시작하세요.")
         logger.info("Ctrl+C로 종료합니다.")
         logger.info("-" * 50)
-        
+
+        sites = sites_config['sites']
+
+        async def post_init(application):
+            # 스케줄러 시작
+            scheduler = WeatherScheduler(application.bot)
+            scheduler.add_morning_report(Config.SCHEDULE_HOUR, Config.SCHEDULE_MINUTE)
+            scheduler.add_cache_refresh(sites, Config.OPENWEATHER_API_KEY, Config.KMA_API_KEY)
+            scheduler.start()
+            logger.info("[OK] 스케줄러 시작 (아침 리포트 + 30분 캐시 갱신)")
+
+            # 초기 캐시 워밍업 (백그라운드)
+            import asyncio as _asyncio
+            loop = _asyncio.get_event_loop()
+            loop.run_in_executor(
+                None, refresh_all_sites_cache,
+                sites, Config.OPENWEATHER_API_KEY, Config.KMA_API_KEY
+            )
+            logger.info("[OK] 초기 캐시 워밍업 시작")
+
         # 비동기 실행
         import asyncio
-        app = bot.create_application()
+        app = bot.create_application(post_init=post_init)
         asyncio.run(app.run_polling())
         
     except KeyboardInterrupt:

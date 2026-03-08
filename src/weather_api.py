@@ -511,6 +511,21 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     return weekend_forecast
 
 
+def refresh_all_sites_cache(sites: list, openweather_key: str, kma_key: str = None) -> None:
+    """모든 지역 캐시 강제 갱신 (스케줄러 호출용)"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def fetch_site(site):
+        cache_key = f"{site['latitude']:.4f},{site['longitude']:.4f}"
+        _forecast_cache.pop(cache_key, None)  # 기존 캐시 무효화 후 새로 가져옴
+        get_weekend_forecast(site['latitude'], site['longitude'], openweather_key, kma_key)
+
+    logger.info(f"[캐시 갱신] {len(sites)}개 지역 갱신 시작...")
+    with ThreadPoolExecutor() as executor:
+        list(executor.map(fetch_site, sites))
+    logger.info("[캐시 갱신] 완료")
+
+
 if __name__ == '__main__':
     # 테스트용 코드
     import os

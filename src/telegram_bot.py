@@ -456,9 +456,12 @@ class ClimbingWeatherBot:
         except Exception as e:
             logger.error(f"아침 리포트 발송 오류: {e}")
     
-    def create_application(self) -> Application:
+    def create_application(self, post_init=None) -> Application:
         """텔레그램 봇 애플리케이션 생성"""
-        self.application = Application.builder().token(self.token).build()
+        builder = Application.builder().token(self.token)
+        if post_init:
+            builder = builder.post_init(post_init)
+        self.application = builder.build()
         
         # 핸들러 추가
         self.application.add_handler(CommandHandler("start", self.start))
