@@ -10,6 +10,10 @@ import pytz
 
 logger = logging.getLogger(__name__)
 
+# 간단한 인메모리 캐시 {cache_key: (timestamp, data)}
+_forecast_cache: dict = {}
+_CACHE_TTL_SECONDS = 3 * 60 * 60  # 3시간
+
 
 class WeatherAPI:
     """기상 데이터 수집 클래스"""
@@ -157,10 +161,13 @@ class WeatherAPI:
                             'forecast': self._parse_kma_forecast(short_data)
                         }
                     else:
-                        logger.debug(f"[KMA] 시도 {fcst_date} {fcst_time}: {result_msg}")
+                        logger.warning(f"[KMA] 시도 {fcst_date} {fcst_time}: code={result_code} msg={result_msg}")
+                        # 인증 오류(20)나 서비스 키 오류면 더 시도해도 의미 없음
+                        if result_code in ('20', '22', '10', '12'):
+                            break
 
                 except requests.exceptions.RequestException as e:
-                    logger.debug(f"[KMA] 시도 {fcst_date} {fcst_time}: 요청 오류 {e}")
+                    logger.warning(f"[KMA] 시도 {fcst_date} {fcst_time}: 요청 오류 {e}")
                     continue
 
             logger.warning(f"[KMA] 모든 시도 실패")
@@ -407,7 +414,18 @@ class WeatherAPI:
 
 
 def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: str = None) -> Dict:
-    """주말 예보 조회 (KMA 우선, 없으면 OpenWeather)"""
+    """주말 예보 조회 (KMA 우선, 없으면 OpenWeather) - 3시간 캐시 적용"""
+    import time
+    cache_key = f"{lat:.4f},{lon:.4f}"
+    now_ts = time.time()
+
+    # 캐시 히트
+    if cache_key in _forecast_cache:
+        cached_ts, cached_data = _forecast_cache[cache_key]
+        if now_ts - cached_ts < _CACHE_TTL_SECONDS:
+            logger.info(f"[캐시] {cache_key} 캐시 사용 (남은시간: {int((_CACHE_TTL_SECONDS - (now_ts - cached_ts)) / 60)}분)")
+            return cached_data
+
     weather_api = WeatherAPI(openweather_key, kma_key)
     
     # KMA 우선으로 시도
@@ -486,7 +504,10 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     sat_count = len(weekend_forecast['saturday'])
     sun_count = len(weekend_forecast['sunday'])
     logger.info(f"[주말 예보] {data_source}: 토요일 {sat_count}개, 일요일 {sun_count}개 데이터 필터링됨")
-    
+
+    # 캐시 저장
+    _forecast_cache[cache_key] = (time.time(), weekend_forecast)
+
     return weekend_forecast
 
 
