@@ -138,7 +138,7 @@ class WeatherAPI:
                 }
                 
                 try:
-                    short_response = requests.get(short_forecast_url, params=short_params, timeout=10)
+                    short_response = requests.get(short_forecast_url, params=short_params, timeout=5)
                     
                     if short_response.status_code != 200:
                         logger.debug(f"[KMA] 시도 {fcst_date} {fcst_time}: HTTP {short_response.status_code}")

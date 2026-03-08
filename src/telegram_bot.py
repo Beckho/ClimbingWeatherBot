@@ -149,16 +149,27 @@ class ClimbingWeatherBot:
         await update.message.reply_text("🔄 주말 예보를 분석 중입니다...")
         
         try:
-            # 모든 지역의 주말 예보 수집
-            all_forecasts = {}
-            for site_name, site in self.sites.items():
-                forecast = get_weekend_forecast(
+            # 모든 지역의 주말 예보 병렬 수집
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+
+            def fetch(site_name, site):
+                return site_name, get_weekend_forecast(
                     site['latitude'],
                     site['longitude'],
                     Config.OPENWEATHER_API_KEY,
                     Config.KMA_API_KEY
                 )
-                all_forecasts[site_name] = forecast
+
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as executor:
+                tasks = [
+                    loop.run_in_executor(executor, fetch, name, site)
+                    for name, site in self.sites.items()
+                ]
+                results = await asyncio.gather(*tasks)
+
+            all_forecasts = {name: forecast for name, forecast in results}
             
             # 표 형식 메시지 생성
             message = self._format_all_weekend_forecasts(all_forecasts)
