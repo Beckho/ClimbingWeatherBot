@@ -684,20 +684,31 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     sun_count = len(weekend_forecast['sunday'])
     logger.info(f"[주말 예보] {data_source}: 토요일 {sat_count}개, 일요일 {sun_count}개 데이터 필터링됨")
 
-    # 다음 주 주말: KMA 중기예보로 채우기
-    if is_weekend_today and region and kma_key:
+    # KMA 중기예보 보완:
+    # 1) 오늘이 주말 → 다음 주 토/일 채우기
+    # 2) 이번 주 토/일이 단기예보 범위(3일) 초과 → 이번 주 토/일도 중기예보로 채우기
+    days_to_saturday = (saturday - today).days if saturday else 0
+    need_midterm_this_week = saturday and len(weekend_forecast['saturday']) == 0 and days_to_saturday > 3
+
+    if region and kma_key and (is_weekend_today or need_midterm_this_week):
         midterm_data = weather_api.get_kma_midterm_forecast(region)
         if midterm_data:
             for fc in midterm_data.get('forecast', []):
                 try:
                     fc_date = datetime.fromisoformat(fc['timestamp']).astimezone(seoul_tz).date()
-                    if next_saturday and fc_date == next_saturday:
-                        weekend_forecast['next_saturday'].append(fc)
-                    elif next_sunday and fc_date == next_sunday:
-                        weekend_forecast['next_sunday'].append(fc)
+                    if need_midterm_this_week:
+                        if saturday and fc_date == saturday:
+                            weekend_forecast['saturday'].append(fc)
+                        elif sunday and fc_date == sunday:
+                            weekend_forecast['sunday'].append(fc)
+                    if is_weekend_today:
+                        if next_saturday and fc_date == next_saturday:
+                            weekend_forecast['next_saturday'].append(fc)
+                        elif next_sunday and fc_date == next_sunday:
+                            weekend_forecast['next_sunday'].append(fc)
                 except Exception as e:
                     logger.warning(f"[KMA 중기] 타임스탬프 파싱 오류: {e}")
-            logger.info(f"[KMA 중기] 다음주 토={len(weekend_forecast['next_saturday'])}개, 일={len(weekend_forecast['next_sunday'])}개")
+            logger.info(f"[KMA 중기] 이번주 토={len(weekend_forecast['saturday'])}개, 일={len(weekend_forecast['sunday'])}개 / 다음주 토={len(weekend_forecast.get('next_saturday',[]))}개, 일={len(weekend_forecast.get('next_sunday',[]))}개")
 
     # 캐시 저장
     _forecast_cache[cache_key] = (time.time(), weekend_forecast)
