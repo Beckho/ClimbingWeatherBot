@@ -346,8 +346,8 @@ class WeatherAPI:
                     fcst_time = time_info['fcst_time']
                     
                     dt_str = f"{fcst_date}{fcst_time}"
-                    dt_utc = datetime.strptime(dt_str, '%Y%m%d%H%M')
-                    dt_kst = dt_utc.replace(tzinfo=timezone.utc).astimezone(seoul_tz)
+                    # KMA fcstDate/fcstTime은 KST이므로 바로 localize
+                    dt_kst = seoul_tz.localize(datetime.strptime(dt_str, '%Y%m%d%H%M'))
                     
                     # 카테고리에서 필요한 값 추출
                     forecast.append({
@@ -610,17 +610,23 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     today_weekday = today.weekday()
     is_weekend_today = today_weekday in (5, 6)
 
-    # 이번 주 주말 날짜 찾기 (7일 범위 - 월요일에도 다음 토/일 포함)
-    saturday = None
-    sunday = None
-    for i in range(8):
-        check_date = today + timedelta(days=i)
-        if check_date.weekday() == 5 and saturday is None:
-            saturday = check_date
-        elif check_date.weekday() == 6 and sunday is None:
-            sunday = check_date
-        if saturday and sunday:
-            break
+    # 이번 주 주말 날짜 (ISO 주 기준: 월~일)
+    # 오늘이 일요일이면 토요일은 어제(과거), 일요일은 오늘
+    # 그 외에는 이번 주 혹은 다음 주 토/일 중 가장 가까운 날
+    if today_weekday == 6:  # 일요일
+        saturday = today - timedelta(days=1)  # 어제 (데이터 없음, 표시용)
+        sunday = today
+    else:
+        saturday = None
+        sunday = None
+        for i in range(8):
+            check_date = today + timedelta(days=i)
+            if check_date.weekday() == 5 and saturday is None:
+                saturday = check_date
+            elif check_date.weekday() == 6 and sunday is None:
+                sunday = check_date
+            if saturday and sunday:
+                break
 
     # 다음 주 주말 날짜 찾기 (오늘이 주말인 경우)
     next_saturday = None

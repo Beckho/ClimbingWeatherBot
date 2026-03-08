@@ -449,8 +449,9 @@ class ClimbingWeatherBot:
                 sec += "```\n\n"
                 return sec
 
-            # 이번 주 토/일
-            message += format_weekend_section(saturday_date, "토", saturday_data)
+            # 이번 주 토/일 (데이터가 없는 섹션은 생략)
+            if saturday_data:
+                message += format_weekend_section(saturday_date, "토", saturday_data)
             message += format_weekend_section(sunday_date, "일", sunday_data)
 
             # 다음 주 토/일 (오늘이 주말인 경우)
