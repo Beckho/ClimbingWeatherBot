@@ -37,15 +37,15 @@ class ClimbingWeatherBot:
 안녕하세요! 🏔️ *클라이밍 날씨 TGTWTG 봇*입니다.
 
 이 봇은 주말 야외 클라이밍에 최적의 날씨 정보를 제공합니다.
+매일 아침 9시에 주말 예보를 자동으로 알려드리며, 언제든지 현재 날씨와 지역 정보를 조회할 수 있습니다.
 
-🔹 *사용 가능한 명령어:*
+🔹 *사용 가능한 명령어 or 클릭:*
 /start - 봇 정보 및 도움말
 /weather - 지금 바로 날씨 조회
 /weekend - 주말 날씨 예보
 /sites - 등록된 클라이밍 지역 목록
 /help - 상세 도움말
 
-💬 "다시 날씨 알려줘" 같은 자연스러운 말로도 요청할 수 있습니다.
         """
         await update.message.reply_text(welcome_message, parse_mode='Markdown')
     
