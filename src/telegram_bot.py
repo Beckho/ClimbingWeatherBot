@@ -420,21 +420,10 @@ class ClimbingWeatherBot:
                 if next_sunday:
                     next_sunday_data[site_name] = summarize(next_sunday)
             
-            # 진단 로그
-            logger.info(f"[주말 포맷] saturday_data: {len(saturday_data)}개, sunday_data: {len(sunday_data)}개, next_saturday: {len(next_saturday_data)}개, next_sunday: {len(next_sunday_data)}개")
-            if saturday_data:
-                sample = next(iter(saturday_data.items()))
-                logger.info(f"[주말 포맷] saturday 샘플: {sample[0]} = {sample[1]}")
-            if sunday_data:
-                sample = next(iter(sunday_data.items()))
-                logger.info(f"[주말 포맷] sunday 샘플: {sample[0]} = {sample[1]}")
-            for site_name, forecast in all_forecasts.items():
-                if forecast:
-                    logger.info(f"[주말 포맷] {site_name}: sat={len(forecast.get('saturday',[]))}개, sun={len(forecast.get('sunday',[]))}개")
-                    break  # 첫 번째 지역만 출력
+            logger.info(f"[주말 포맷] sat={len(saturday_data)}, sun={len(sunday_data)}, next_sat={len(next_saturday_data)}, next_sun={len(next_sunday_data)}")
 
-            # 데이터가 없으면 None 반환
-            if not saturday_data and not sunday_data:
+            # 데이터가 전혀 없으면 None 반환
+            if not saturday_data and not sunday_data and not next_saturday_data and not next_sunday_data:
                 return None
 
             # 소스 표시
@@ -488,7 +477,8 @@ class ClimbingWeatherBot:
             # 이번 주 토/일 (데이터가 없는 섹션은 생략)
             if saturday_data:
                 message += format_weekend_section(saturday_date, "토", saturday_data)
-            message += format_weekend_section(sunday_date, "일", sunday_data)
+            if sunday_data:
+                message += format_weekend_section(sunday_date, "일", sunday_data)
 
             # 다음 주 토/일 (오늘이 주말인 경우)
             if has_next_weekend:
