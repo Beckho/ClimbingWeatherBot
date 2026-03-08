@@ -89,10 +89,9 @@ def main():
             )
             logger.info("[OK] 초기 캐시 워밍업 시작")
 
-        # 비동기 실행
-        import asyncio
+        # run_polling()은 PTB v20에서 내부적으로 이벤트 루프를 관리하는 동기 메서드
         app = bot.create_application(post_init=post_init)
-        asyncio.run(app.run_polling())
+        app.run_polling()
         
     except KeyboardInterrupt:
         logger.info("\n프로그램 종료됨 (사용자 중단)")
