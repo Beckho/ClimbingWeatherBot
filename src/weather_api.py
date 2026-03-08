@@ -113,13 +113,18 @@ class WeatherAPI:
             now = datetime.now(seoul_tz)
             
             short_forecast_url = f"{self.kma_base_url}/getVilageFcst"
-            
-            # 현재부터 과거 6시간까지 시도 (3시간 단위)
-            max_attempts = 6
-            for hours_back in range(max_attempts):
-                attempt_dt = now - timedelta(hours=hours_back)
-                fcst_date = attempt_dt.strftime('%Y%m%d')
-                fcst_time = attempt_dt.strftime('%H00')
+
+            # 기상청 유효 발표 시각 (getVilageFcst는 이 시각에만 데이터 제공)
+            valid_base_times = ['2300', '2000', '1700', '1400', '1100', '0800', '0500', '0200']
+
+            # 현재 시각 기준으로 가장 최근 유효 발표 시각 목록 생성 (최대 2일치 시도)
+            candidates = []
+            for days_back in range(2):
+                check_dt = now - timedelta(days=days_back)
+                for bt in valid_base_times:
+                    candidates.append((check_dt.strftime('%Y%m%d'), bt))
+
+            for fcst_date, fcst_time in candidates:
                 
                 short_params = {
                     'serviceKey': self.kma_key,
@@ -136,29 +141,29 @@ class WeatherAPI:
                     short_response = requests.get(short_forecast_url, params=short_params, timeout=10)
                     
                     if short_response.status_code != 200:
-                        logger.debug(f"[KMA] 시도 {hours_back}: HTTP {short_response.status_code}")
+                        logger.debug(f"[KMA] 시도 {fcst_date} {fcst_time}: HTTP {short_response.status_code}")
                         continue
-                    
+
                     short_data = short_response.json()
                     result_code = short_data.get('response', {}).get('header', {}).get('resultCode')
                     result_msg = short_data.get('response', {}).get('header', {}).get('resultMsg')
-                    
+
                     if result_code == '00':
-                        logger.info(f"[KMA] 초단기예보 조회 성공: {fcst_date} {fcst_time} ({hours_back}시간 전)")
-                        
+                        logger.info(f"[KMA] 초단기예보 조회 성공: {fcst_date} {fcst_time}")
+
                         return {
                             'source': 'KMA',
                             'current': self._parse_kma_current(short_data),
                             'forecast': self._parse_kma_forecast(short_data)
                         }
                     else:
-                        logger.debug(f"[KMA] 시도 {hours_back}: {result_msg}")
-                        
+                        logger.debug(f"[KMA] 시도 {fcst_date} {fcst_time}: {result_msg}")
+
                 except requests.exceptions.RequestException as e:
-                    logger.debug(f"[KMA] 시도 {hours_back}: 요청 오류 {e}")
+                    logger.debug(f"[KMA] 시도 {fcst_date} {fcst_time}: 요청 오류 {e}")
                     continue
-            
-            logger.warning(f"[KMA] 모든 시도 실패 (최대 6시간 확인)")
+
+            logger.warning(f"[KMA] 모든 시도 실패")
             return None
             
         except Exception as e:
