@@ -398,6 +398,126 @@ class WeatherAPI:
         except:
             return '날씨 조회 불가'
     
+    def get_kma_midterm_forecast(self, region: str) -> Optional[Dict]:
+        """KMA 중기예보 조회 (D+3~D+10) - 지역명 기반"""
+        if not self.kma_key:
+            return None
+
+        # 중기육상예보 지역 코드 (getMidLandFcst)
+        land_reg_map = {
+            '서울':     '11B00000',
+            '경기도':   '11B00000',
+            '인천':     '11B00000',
+            '강원도':   '11D10000',
+            '전라북도': '11F10000',
+            '전라남도': '11F20000',
+            '광주':     '11F20000',
+            '경상북도': '11H10000',
+            '대구':     '11H10000',
+            '경상남도': '11H20000',
+            '부산':     '11H20000',
+            '울산':     '11H20000',
+        }
+        # 중기기온조회 지역 코드 (getMidTa)
+        ta_reg_map = {
+            '서울':     '11B10101',
+            '경기도':   '11B20601',  # 수원
+            '인천':     '11B20201',
+            '강원도':   '11D10401',  # 원주 (영서)
+            '전라북도': '11F10201',  # 전주
+            '전라남도': '11F20401',  # 순천
+            '광주':     '11F20501',
+            '경상북도': '11H10201',  # 안동
+            '대구':     '11H10701',
+            '경상남도': '11H20101',  # 창원
+            '부산':     '11H20201',
+            '울산':     '11H20301',
+        }
+
+        land_reg_id = land_reg_map.get(region)
+        ta_reg_id = ta_reg_map.get(region)
+        if not land_reg_id or not ta_reg_id:
+            logger.warning(f"[KMA 중기] 알 수 없는 지역: {region}")
+            return None
+
+        seoul_tz = pytz.timezone('Asia/Seoul')
+        now = datetime.now(seoul_tz)
+
+        # tmFc: 0600 또는 1800 KST (발표 기준시각)
+        if now.hour >= 18:
+            tmFc = now.strftime('%Y%m%d') + '1800'
+        elif now.hour >= 6:
+            tmFc = now.strftime('%Y%m%d') + '0600'
+        else:
+            tmFc = (now - timedelta(days=1)).strftime('%Y%m%d') + '1800'
+
+        common_params = {
+            'serviceKey': self.kma_key,
+            'pageNo': '1',
+            'numOfRows': '10',
+            'dataType': 'JSON',
+            'tmFc': tmFc,
+        }
+
+        try:
+            land_resp = requests.get(
+                f"{self.kma_base_url}/getMidLandFcst",
+                params={**common_params, 'regId': land_reg_id}, timeout=5
+            )
+            ta_resp = requests.get(
+                f"{self.kma_base_url}/getMidTa",
+                params={**common_params, 'regId': ta_reg_id}, timeout=5
+            )
+
+            land_items = land_resp.json().get('response', {}).get('body', {}).get('items', {}).get('item', [])
+            ta_items = ta_resp.json().get('response', {}).get('body', {}).get('items', {}).get('item', [])
+
+            land_item = land_items[0] if isinstance(land_items, list) and land_items else land_items if isinstance(land_items, dict) else {}
+            ta_item = ta_items[0] if isinstance(ta_items, list) and ta_items else ta_items if isinstance(ta_items, dict) else {}
+
+            if not land_item or not ta_item:
+                logger.warning(f"[KMA 중기] {region} 응답 데이터 없음 (tmFc={tmFc})")
+                return None
+
+            # D+3~D+10 날짜별 forecast 생성
+            today = now.date()
+            forecast = []
+            for d in range(3, 11):
+                fcst_date = today + timedelta(days=d)
+                # 3~7일은 오전/오후 구분, 8~10일은 통합
+                if d <= 7:
+                    rain_prob = (land_item.get(f'rnSt{d}Am', 0) + land_item.get(f'rnSt{d}Pm', 0)) / 2
+                    weather = land_item.get(f'wf{d}Pm') or land_item.get(f'wf{d}Am') or ''
+                else:
+                    rain_prob = land_item.get(f'rnSt{d}', 0)
+                    weather = land_item.get(f'wf{d}', '')
+
+                temp_min = ta_item.get(f'taMin{d}', 0)
+                temp_max = ta_item.get(f'taMax{d}', 0)
+
+                forecast.append({
+                    'timestamp': datetime.combine(fcst_date, datetime.min.time()).replace(tzinfo=seoul_tz).isoformat(),
+                    'temp': (temp_min + temp_max) / 2,
+                    'temp_min': temp_min,
+                    'temp_max': temp_max,
+                    'humidity': 0,
+                    'wind_speed': 0,
+                    'rain_prob': rain_prob,
+                    'rain': 0,
+                    'description': weather
+                })
+
+            logger.info(f"[KMA 중기] {region}: {len(forecast)}일치 예보 완료 (tmFc={tmFc})")
+            return {
+                'source': 'KMA_mid',
+                'forecast': forecast,
+                'announced_at': f"{tmFc[:4]}-{tmFc[4:6]}-{tmFc[6:8]} {tmFc[8:10]}:00"
+            }
+
+        except Exception as e:
+            logger.error(f"[KMA 중기] {region} 오류: {e}")
+            return None
+
     def get_multiple_forecasts(self, lat: float, lon: float) -> Dict:
         """여러 기상 API에서 데이터 수집"""
         forecasts = {}
@@ -415,7 +535,7 @@ class WeatherAPI:
         return forecasts
 
 
-def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: str = None) -> Dict:
+def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: str = None, region: str = None) -> Dict:
     """주말 예보 조회 (KMA 우선, 없으면 OpenWeather) - 3시간 캐시 적용"""
     import time
     cache_key = f"{lat:.4f},{lon:.4f}"
@@ -521,6 +641,21 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     sun_count = len(weekend_forecast['sunday'])
     logger.info(f"[주말 예보] {data_source}: 토요일 {sat_count}개, 일요일 {sun_count}개 데이터 필터링됨")
 
+    # 다음 주 주말: KMA 중기예보로 채우기
+    if is_weekend_today and region and kma_key:
+        midterm_data = weather_api.get_kma_midterm_forecast(region)
+        if midterm_data:
+            for fc in midterm_data.get('forecast', []):
+                try:
+                    fc_date = datetime.fromisoformat(fc['timestamp']).astimezone(seoul_tz).date()
+                    if next_saturday and fc_date == next_saturday:
+                        weekend_forecast['next_saturday'].append(fc)
+                    elif next_sunday and fc_date == next_sunday:
+                        weekend_forecast['next_sunday'].append(fc)
+                except Exception as e:
+                    logger.warning(f"[KMA 중기] 타임스탬프 파싱 오류: {e}")
+            logger.info(f"[KMA 중기] 다음주 토={len(weekend_forecast['next_saturday'])}개, 일={len(weekend_forecast['next_sunday'])}개")
+
     # 캐시 저장
     _forecast_cache[cache_key] = (time.time(), weekend_forecast)
 
@@ -534,7 +669,7 @@ def refresh_all_sites_cache(sites: list, openweather_key: str, kma_key: str = No
     def fetch_site(site):
         cache_key = f"{site['latitude']:.4f},{site['longitude']:.4f}"
         _forecast_cache.pop(cache_key, None)  # 기존 캐시 무효화 후 새로 가져옴
-        get_weekend_forecast(site['latitude'], site['longitude'], openweather_key, kma_key)
+        get_weekend_forecast(site['latitude'], site['longitude'], openweather_key, kma_key, site.get('region'))
 
     logger.info(f"[캐시 갱신] {len(sites)}개 지역 갱신 시작...")
     with ThreadPoolExecutor() as executor:

@@ -158,7 +158,8 @@ class ClimbingWeatherBot:
                     site['latitude'],
                     site['longitude'],
                     Config.OPENWEATHER_API_KEY,
-                    Config.KMA_API_KEY
+                    Config.KMA_API_KEY,
+                    site.get('region')
                 )
 
             loop = asyncio.get_event_loop()
