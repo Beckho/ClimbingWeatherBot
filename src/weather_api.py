@@ -610,15 +610,17 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     today_weekday = today.weekday()
     is_weekend_today = today_weekday in (5, 6)
 
-    # 이번 주 주말 날짜 찾기 (5일 범위)
+    # 이번 주 주말 날짜 찾기 (7일 범위 - 월요일에도 다음 토/일 포함)
     saturday = None
     sunday = None
-    for i in range(5):
+    for i in range(8):
         check_date = today + timedelta(days=i)
         if check_date.weekday() == 5 and saturday is None:
             saturday = check_date
         elif check_date.weekday() == 6 and sunday is None:
             sunday = check_date
+        if saturday and sunday:
+            break
 
     # 다음 주 주말 날짜 찾기 (오늘이 주말인 경우)
     next_saturday = None
