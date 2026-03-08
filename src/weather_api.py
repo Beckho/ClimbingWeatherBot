@@ -136,7 +136,7 @@ class WeatherAPI:
                 short_params = {
                     'serviceKey': self.kma_key,
                     'pageNo': '1',
-                    'numOfRows': '100',
+                    'numOfRows': '1000',
                     'dataType': 'JSON',
                     'base_date': fcst_date,
                     'base_time': fcst_time,
@@ -481,8 +481,29 @@ class WeatherAPI:
                 params={**common_params, 'regId': ta_reg_id}, timeout=5
             )
 
-            land_items = land_resp.json().get('response', {}).get('body', {}).get('items', {}).get('item', [])
-            ta_items = ta_resp.json().get('response', {}).get('body', {}).get('items', {}).get('item', [])
+            logger.info(f"[KMA 중기] getMidLandFcst HTTP {land_resp.status_code}, getMidTa HTTP {ta_resp.status_code}")
+
+            if land_resp.status_code != 200:
+                logger.warning(f"[KMA 중기] getMidLandFcst 오류 응답: {land_resp.text[:200]}")
+                return None
+            if ta_resp.status_code != 200:
+                logger.warning(f"[KMA 중기] getMidTa 오류 응답: {ta_resp.text[:200]}")
+                return None
+
+            land_json = land_resp.json()
+            ta_json = ta_resp.json()
+
+            land_code = land_json.get('response', {}).get('header', {}).get('resultCode')
+            ta_code = ta_json.get('response', {}).get('header', {}).get('resultCode')
+            if land_code != '00':
+                logger.warning(f"[KMA 중기] getMidLandFcst resultCode={land_code} msg={land_json.get('response',{}).get('header',{}).get('resultMsg')}")
+                return None
+            if ta_code != '00':
+                logger.warning(f"[KMA 중기] getMidTa resultCode={ta_code} msg={ta_json.get('response',{}).get('header',{}).get('resultMsg')}")
+                return None
+
+            land_items = land_json.get('response', {}).get('body', {}).get('items', {}).get('item', [])
+            ta_items = ta_json.get('response', {}).get('body', {}).get('items', {}).get('item', [])
 
             land_item = land_items[0] if isinstance(land_items, list) and land_items else land_items if isinstance(land_items, dict) else {}
             ta_item = ta_items[0] if isinstance(ta_items, list) and ta_items else ta_items if isinstance(ta_items, dict) else {}
