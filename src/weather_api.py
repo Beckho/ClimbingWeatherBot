@@ -10,9 +10,11 @@ import pytz
 
 logger = logging.getLogger(__name__)
 
-# 간단한 인메모리 캐시 {cache_key: (timestamp, data)}
-_forecast_cache: dict = {}
-_CACHE_TTL_SECONDS = 3 * 60 * 60  # 3시간
+# 인메모리 캐시
+_forecast_cache: dict = {}          # {lat,lon: (ts, data)} - 단기예보
+_midterm_cache: dict = {}           # {region: (ts, data)} - 중기예보
+_CACHE_TTL_SECONDS = 3 * 60 * 60   # 3시간 (단기)
+_MIDTERM_TTL_SECONDS = 6 * 60 * 60 # 6시간 (중기, 하루 2회 발표)
 
 
 class WeatherAPI:
@@ -23,6 +25,7 @@ class WeatherAPI:
         self.kma_key = kma_key
         self.openweather_base_url = "https://api.openweathermap.org/data/2.5"
         self.kma_base_url = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0"
+        self.kma_mid_base_url = "https://apis.data.go.kr/1360000/MidFcstInfoService"
     
     def get_openweather(self, lat: float, lon: float) -> Optional[Dict]:
         """OpenWeather API에서 날씨 데이터 조회"""
@@ -459,13 +462,22 @@ class WeatherAPI:
             'tmFc': tmFc,
         }
 
+        # 캐시 확인
+        import time as _time
+        cached = _midterm_cache.get(region)
+        if cached:
+            cached_ts, cached_data = cached
+            if _time.time() - cached_ts < _MIDTERM_TTL_SECONDS:
+                logger.info(f"[KMA 중기] {region} 캐시 사용")
+                return cached_data
+
         try:
             land_resp = requests.get(
-                f"{self.kma_base_url}/getMidLandFcst",
+                f"{self.kma_mid_base_url}/getMidLandFcst",
                 params={**common_params, 'regId': land_reg_id}, timeout=5
             )
             ta_resp = requests.get(
-                f"{self.kma_base_url}/getMidTa",
+                f"{self.kma_mid_base_url}/getMidTa",
                 params={**common_params, 'regId': ta_reg_id}, timeout=5
             )
 
@@ -507,12 +519,14 @@ class WeatherAPI:
                     'description': weather
                 })
 
-            logger.info(f"[KMA 중기] {region}: {len(forecast)}일치 예보 완료 (tmFc={tmFc})")
-            return {
+            result = {
                 'source': 'KMA_mid',
                 'forecast': forecast,
                 'announced_at': f"{tmFc[:4]}-{tmFc[4:6]}-{tmFc[6:8]} {tmFc[8:10]}:00"
             }
+            logger.info(f"[KMA 중기] {region}: {len(forecast)}일치 예보 완료 (tmFc={tmFc})")
+            _midterm_cache[region] = (_time.time(), result)
+            return result
 
         except Exception as e:
             logger.error(f"[KMA 중기] {region} 오류: {e}")
