@@ -452,11 +452,11 @@ class ClimbingWeatherBot:
                 COL_NAME = 15  # 삼천바위(완주)(표시너비 14) + 여백 1
                 COL_TEMP = 9   # 최대 -5~-2°C (8자)
                 COL_WIND = 8   # 최대 10.5m/s (7자)
-                sec += ljust_dw("지역", COL_NAME) + ljust_dw("온도", COL_TEMP) + ljust_dw("풍속", COL_WIND) + "★\n"
+                sec += ljust_dw("지역", COL_NAME) + ljust_dw("온도", COL_TEMP) + ljust_dw("풍속", COL_WIND) + "날씨 ★\n"
                 sec += "-" * (COL_NAME + COL_TEMP + COL_WIND + 2) + "\n"
                 if data_dict:
                     for sname in sorted(data_dict.keys()):
-                        min_t, max_t, wind, _ = data_dict[sname]
+                        min_t, max_t, wind, weather_icon = data_dict[sname]
                         wind_str = "--" if wind == 0.0 else f"{wind:.1f}m/s"
                         try:
                             avg_temp = (float(min_t) + float(max_t)) / 2
@@ -466,7 +466,7 @@ class ClimbingWeatherBot:
                         except Exception:
                             suit_emoji = "❓"
                         temp_str = f"{min_t}~{max_t}°C"
-                        sec += ljust_dw(sname, COL_NAME) + ljust_dw(temp_str, COL_TEMP) + ljust_dw(wind_str, COL_WIND) + suit_emoji + "\n"
+                        sec += ljust_dw(sname, COL_NAME) + ljust_dw(temp_str, COL_TEMP) + ljust_dw(wind_str, COL_WIND) + weather_icon + suit_emoji + "\n"
                 else:
                     sec += "데이터 없음 (예보 범위 초과)\n"
                 sec += "```\n\n"
