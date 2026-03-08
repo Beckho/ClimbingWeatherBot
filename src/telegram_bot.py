@@ -112,10 +112,8 @@ class ClimbingWeatherBot:
 ☀️ 맑음, ☁️ 흐림, 🌧️ 비, ❄️ 눈, ⛈️ 뇌우, 🌫️ 안개
 
 🔔 **자동 알림:**
-매일 아침 7시에 자동으로 주말 예보 발송 (설정 가능)
+매일 아침 9시에 자동으로 주말 예보 발송
 
-⚙️ **설정:**
-.env 파일에서 SCHEDULE_HOUR, SCHEDULE_MINUTE 수정
         """
         await update.message.reply_text(help_message, parse_mode='Markdown')
     
