@@ -34,6 +34,14 @@ class ClimbingWeatherBot:
         chat_id = update.effective_chat.id
         logger.info(f"사용자 시작: {user.id} - {user.username} (chat_id={chat_id})")
 
+        admin_ids = [cid.strip() for cid in Config.TELEGRAM_CHAT_ID.split(',') if cid.strip()]
+        is_admin = str(chat_id) in admin_ids
+
+        subscribe_notice = "" if is_admin else """
+🔔 *매일 아침 자동 예보 구독 안내*
+구독 신청이 관리자에게 자동으로 전달되었습니다.
+관리자가 확인 후 구독을 추가해 드릴 예정입니다."""
+
         welcome_message = f"""
 안녕하세요! 🏔️ *클라이밍 날씨 TGTWTG 봇*입니다.
 
@@ -46,36 +54,31 @@ class ClimbingWeatherBot:
 /weekend - 주말 날씨 예보
 /sites - 등록된 클라이밍 지역 목록
 /help - 상세 도움말
-
-🔔 *매일 아침 자동 예보 구독 안내*
-회원님의 Chat ID: `{chat_id}`
-위 Chat ID를 관리자에게 전달하시면 자동 예보 구독이 가능합니다.
+{subscribe_notice}
         """
         await update.message.reply_text(welcome_message, parse_mode='Markdown')
 
         # 관리자(첫 번째 TELEGRAM_CHAT_ID)에게 새 사용자 알림
-        admin_ids = [cid.strip() for cid in Config.TELEGRAM_CHAT_ID.split(',') if cid.strip()]
-        if admin_ids:
+        if admin_ids and not is_admin:
             admin_id = admin_ids[0]
-            if str(chat_id) != admin_id:
-                try:
-                    username_str = f"@{user.username}" if user.username else "(없음)"
-                    name_str = user.full_name or user.first_name or "?"
-                    notify_msg = (
-                        f"🔔 *새 사용자가 봇을 시작했습니다*\n\n"
-                        f"이름: {name_str}\n"
-                        f"유저명: {username_str}\n"
-                        f"Chat ID: `{chat_id}`\n\n"
-                        f"구독 추가 시 TELEGRAM\\_CHAT\\_ID에 이 Chat ID를 추가하세요."
-                    )
-                    await context.bot.send_message(
-                        chat_id=admin_id,
-                        text=notify_msg,
-                        parse_mode='Markdown'
-                    )
-                    logger.info(f"관리자({admin_id})에게 새 사용자 알림 전송 완료")
-                except Exception as e:
-                    logger.error(f"관리자 알림 전송 실패: {e}")
+            try:
+                username_str = f"@{user.username}" if user.username else "(없음)"
+                name_str = user.full_name or user.first_name or "?"
+                notify_msg = (
+                    f"🔔 *새 사용자가 봇을 시작했습니다*\n\n"
+                    f"이름: {name_str}\n"
+                    f"유저명: {username_str}\n"
+                    f"Chat ID: `{chat_id}`\n\n"
+                    f"구독 추가 시 TELEGRAM\\_CHAT\\_ID에 이 Chat ID를 추가하세요."
+                )
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=notify_msg,
+                    parse_mode='Markdown'
+                )
+                logger.info(f"관리자({admin_id})에게 새 사용자 알림 전송 완료")
+            except Exception as e:
+                logger.error(f"관리자 알림 전송 실패: {e}")
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """도움말"""
