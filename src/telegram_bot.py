@@ -38,9 +38,9 @@ class ClimbingWeatherBot:
         is_admin = str(chat_id) in admin_ids
 
         subscribe_notice = "" if is_admin else """
-🔔 *매일 아침 자동 예보 구독 안내*
-구독 신청이 관리자에게 자동으로 전달되었습니다.
-관리자가 확인 후 구독을 추가해 드릴 예정입니다."""
+🔔 *매일 아침 자동 예보 알림 설정 안내*
+알림 설정 신청이 관리자에게 자동으로 전달되었습니다.
+관리자가 확인 후 알림을 추가해 드릴 예정입니다."""
 
         welcome_message = f"""
 안녕하세요! 🏔️ *클라이밍 날씨 TGTWTG 봇*입니다.
@@ -53,6 +53,7 @@ class ClimbingWeatherBot:
 /weather - 지금 바로 날씨 조회
 /weekend - 주말 날씨 예보
 /sites - 등록된 클라이밍 지역 목록
+/unsubscribe - 자동 예보 알림 해제
 /help - 상세 도움말
 {subscribe_notice}
         """
@@ -69,7 +70,7 @@ class ClimbingWeatherBot:
                     f"이름: {name_str}\n"
                     f"유저명: {username_str}\n"
                     f"Chat ID: `{chat_id}`\n\n"
-                    f"구독 추가 시 TELEGRAM\\_CHAT\\_ID에 이 Chat ID를 추가하세요."
+                    f"알림 설정 추가 시 TELEGRAM\\_CHAT\\_ID에 이 Chat ID를 추가하세요."
                 )
                 await context.bot.send_message(
                     chat_id=admin_id,
@@ -531,19 +532,61 @@ class ClimbingWeatherBot:
         except Exception as e:
             logger.error(f"아침 리포트 발송 오류: {e}")
     
+    async def unsubscribe_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """구독 해제 명령어"""
+        user = update.effective_user
+        chat_id = update.effective_chat.id
+
+        admin_ids = [cid.strip() for cid in Config.TELEGRAM_CHAT_ID.split(',') if cid.strip()]
+        is_subscribed = str(chat_id) in admin_ids
+
+        if not is_subscribed:
+            await update.message.reply_text(
+                "현재 자동 예보 알림이 설정되어 있지 않습니다."
+            )
+            return
+
+        await update.message.reply_text(
+            "알림 해제 요청이 관리자에게 전달되었습니다.\n"
+            "관리자가 확인 후 알림을 해제해 드릴 예정입니다."
+        )
+
+        if admin_ids:
+            admin_id = admin_ids[0]
+            if str(chat_id) != admin_id:
+                try:
+                    username_str = f"@{user.username}" if user.username else "(없음)"
+                    name_str = user.full_name or user.first_name or "?"
+                    notify_msg = (
+                        f"🔕 *알림 해제 요청*\n\n"
+                        f"이름: {name_str}\n"
+                        f"유저명: {username_str}\n"
+                        f"Chat ID: `{chat_id}`\n\n"
+                        f"TELEGRAM\\_CHAT\\_ID에서 이 Chat ID를 제거해 주세요."
+                    )
+                    await context.bot.send_message(
+                        chat_id=admin_id,
+                        text=notify_msg,
+                        parse_mode='Markdown'
+                    )
+                    logger.info(f"구독 해제 요청 알림 전송: {chat_id} → 관리자({admin_id})")
+                except Exception as e:
+                    logger.error(f"구독 해제 알림 전송 실패: {e}")
+
     def create_application(self, post_init=None) -> Application:
         """텔레그램 봇 애플리케이션 생성"""
         builder = Application.builder().token(self.token)
         if post_init:
             builder = builder.post_init(post_init)
         self.application = builder.build()
-        
+
         # 핸들러 추가
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CommandHandler("weather", self.weather_command))
         self.application.add_handler(CommandHandler("weekend", self.weekend_command))
         self.application.add_handler(CommandHandler("sites", self.sites_command))
+        self.application.add_handler(CommandHandler("unsubscribe", self.unsubscribe_command))
         
         # 메시지 핸들러 (텍스트 메시지 처리)
         self.application.add_handler(
