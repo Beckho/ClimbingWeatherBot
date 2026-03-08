@@ -22,7 +22,7 @@ class WeatherAPI:
         self.openweather_key = openweather_key
         self.kma_key = kma_key
         self.openweather_base_url = "https://api.openweathermap.org/data/2.5"
-        self.kma_base_url = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0"
+        self.kma_base_url = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0"
     
     def get_openweather(self, lat: float, lon: float) -> Optional[Dict]:
         """OpenWeather API에서 날씨 데이터 조회"""
