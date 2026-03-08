@@ -24,6 +24,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# httpx 폴링 로그 억제 (10초마다 반복되는 getUpdates 로그)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+
 
 class Config:
     """애플리케이션 설정"""
