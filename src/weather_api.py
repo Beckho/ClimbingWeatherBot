@@ -689,6 +689,15 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     # 2) 이번 주 토/일이 단기예보 범위(3일) 초과 → 이번 주 토/일도 중기예보로 채우기
     days_to_saturday = (saturday - today).days if saturday else 0
     days_to_sunday = (sunday - today).days if sunday else 0
+
+    # 3일 초과 구간이면 단기예보 데이터가 불완전하므로 버리고 중기예보로 대체
+    if days_to_saturday > 3 and weekend_forecast['saturday']:
+        logger.info(f"[주말 예보] 토요일 D+{days_to_saturday} → 단기예보 {len(weekend_forecast['saturday'])}개 제거 후 중기로 대체")
+        weekend_forecast['saturday'] = []
+    if days_to_sunday > 3 and weekend_forecast['sunday']:
+        logger.info(f"[주말 예보] 일요일 D+{days_to_sunday} → 단기예보 {len(weekend_forecast['sunday'])}개 제거 후 중기로 대체")
+        weekend_forecast['sunday'] = []
+
     need_midterm_sat = bool(saturday and len(weekend_forecast['saturday']) == 0 and days_to_saturday > 3)
     need_midterm_sun = bool(sunday and len(weekend_forecast['sunday']) == 0 and days_to_sunday > 3)
     need_midterm_this_week = need_midterm_sat or need_midterm_sun
