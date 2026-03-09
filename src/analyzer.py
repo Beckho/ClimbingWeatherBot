@@ -91,11 +91,11 @@ class WeatherAnalyzer:
     def get_rating_emoji(rating: str) -> str:
         """평점 이모지"""
         emojis = {
-            'perfect': '🟢',
-            'good': '🟡',
-            'fair': '🟠',
-            'poor': '🔴',
-            'very_poor': '⛔'
+            'perfect': '😄',
+            'good': '🙂',
+            'fair': '😐',
+            'poor': '😟',
+            'very_poor': '😵'
         }
         return emojis.get(rating, '❓')
     

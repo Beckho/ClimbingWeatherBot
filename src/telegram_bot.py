@@ -471,7 +471,11 @@ class ClimbingWeatherBot:
                         sec += ljust_dw(sname, COL_NAME) + ljust_dw(temp_str, COL_TEMP) + ljust_dw(wind_str, COL_WIND) + weather_icon + suit_emoji + "\n"
                 else:
                     sec += "데이터 없음 (예보 범위 초과)\n"
-                sec += "```\n\n"
+                sec += "```\n"
+                # 풍속이 전부 0이면 중기예보 데이터 → 안내 추가
+                if data_dict and all(v[2] == 0.0 for v in data_dict.values()):
+                    sec += "_풍속은 5일 이내 예보에서만 제공됩니다_\n"
+                sec += "\n"
                 return sec
 
             # 이번 주 토/일 (데이터가 없는 섹션은 생략)

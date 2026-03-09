@@ -35,7 +35,7 @@ class WeatherScheduler:
         """아침 날씨 리포트 스케줄 추가"""
         self.scheduler.add_job(
             self.bot.send_morning_report,
-            trigger=CronTrigger(hour=hour, minute=minute),
+            trigger=CronTrigger(hour=hour, minute=minute, timezone='Asia/Seoul'),
             id='morning_report',
             name='일일 아침 날씨 리포트',
             replace_existing=True
