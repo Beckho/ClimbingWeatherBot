@@ -60,3 +60,6 @@ dmypy.json
 # 기타
 *.tmp
 temp/
+
+# 구독자 데이터
+data/subscribers.json

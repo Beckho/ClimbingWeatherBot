@@ -16,6 +16,7 @@ import json
 from weather_api import get_weekend_forecast
 from analyzer import WeatherAnalyzer
 from config import Config
+import subscriber_store
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,11 @@ class ClimbingWeatherBot:
                     chat_id=admin_id,
                     text=notify_msg,
                     parse_mode='Markdown'
+                )
+                subscriber_store.add_request(
+                    str(chat_id),
+                    user.username or '',
+                    user.full_name or user.first_name or ''
                 )
                 logger.info(f"관리자({admin_id})에게 새 사용자 알림 전송 완료")
             except Exception as e:
@@ -599,9 +605,64 @@ class ClimbingWeatherBot:
                         text=notify_msg,
                         parse_mode='Markdown'
                     )
+                    subscriber_store.remove_request(
+                        str(chat_id),
+                        user.username or '',
+                        user.full_name or user.first_name or ''
+                    )
                     logger.info(f"구독 해제 요청 알림 전송: {chat_id} → 관리자({admin_id})")
                 except Exception as e:
                     logger.error(f"구독 해제 알림 전송 실패: {e}")
+
+    async def manage_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """관리자 전용 구독자 관리 명령어"""
+        chat_id = update.effective_chat.id
+        admin_ids = [cid.strip() for cid in Config.TELEGRAM_CHAT_ID.split(',') if cid.strip()]
+
+        if str(chat_id) not in admin_ids:
+            await update.message.reply_text("관리자만 사용할 수 있는 명령어입니다.")
+            return
+
+        current_ids = admin_ids
+        pending_add = subscriber_store.get_pending_add()
+        pending_remove = subscriber_store.get_pending_remove()
+
+        msg = "📋 *구독자 관리 현황*\n\n"
+
+        # 현재 구독자
+        msg += f"*✅ 현재 구독 중 ({len(current_ids)}명)*\n"
+        for cid in current_ids:
+            msg += f"  `{cid}`\n"
+
+        # 추가 대기
+        msg += f"\n*🟡 추가 요청 대기 ({len(pending_add)}명)*\n"
+        if pending_add:
+            for r in pending_add:
+                uname = f"@{r['username']}" if r['username'] else "(없음)"
+                date_str = r['requested_at'][:10]
+                msg += f"  {r['name']} {uname} | `{r['chat_id']}` | {date_str}\n"
+        else:
+            msg += "  없음\n"
+
+        # 제거 대기
+        msg += f"\n*🔴 취소 요청 대기 ({len(pending_remove)}명)*\n"
+        if pending_remove:
+            for r in pending_remove:
+                uname = f"@{r['username']}" if r['username'] else "(없음)"
+                date_str = r['requested_at'][:10]
+                msg += f"  {r['name']} {uname} | `{r['chat_id']}` | {date_str}\n"
+        else:
+            msg += "  없음\n"
+
+        # 추천 TELEGRAM_CHAT_ID 값
+        add_ids = [r['chat_id'] for r in pending_add]
+        remove_ids = {r['chat_id'] for r in pending_remove}
+        new_ids = [cid for cid in current_ids if cid not in remove_ids] + add_ids
+        recommended = ','.join(new_ids)
+
+        msg += f"\n*📝 모두 반영 시 TELEGRAM\\_CHAT\\_ID:*\n`{recommended}`"
+
+        await update.message.reply_text(msg, parse_mode='Markdown')
 
     def create_application(self, post_init=None) -> Application:
         """텔레그램 봇 애플리케이션 생성"""
@@ -617,7 +678,8 @@ class ClimbingWeatherBot:
         self.application.add_handler(CommandHandler("weekend", self.weekend_command))
         self.application.add_handler(CommandHandler("sites", self.sites_command))
         self.application.add_handler(CommandHandler("unsubscribe", self.unsubscribe_command))
-        
+        self.application.add_handler(CommandHandler("manage", self.manage_command))
+
         # 메시지 핸들러 (텍스트 메시지 처리)
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.message_handler)
