@@ -513,10 +513,12 @@ class WeatherAPI:
                 return None
 
             # D+3~D+10 날짜별 forecast 생성
-            today = now.date()
+            # tmFc 기준일을 사용해야 taMin{d}/taMax{d} 인덱스와 날짜가 일치
+            # (자정~06:00 사이에는 tmFc가 어제 18:00이므로 today와 다름)
+            tmFc_date = datetime.strptime(tmFc[:8], '%Y%m%d').date()
             forecast = []
             for d in range(3, 11):
-                fcst_date = today + timedelta(days=d)
+                fcst_date = tmFc_date + timedelta(days=d)
                 # 3~7일은 오전/오후 구분, 8~10일은 통합
                 if d <= 7:
                     rain_prob = (land_item.get(f'rnSt{d}Am', 0) + land_item.get(f'rnSt{d}Pm', 0)) / 2
