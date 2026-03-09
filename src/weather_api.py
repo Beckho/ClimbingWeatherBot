@@ -125,10 +125,14 @@ class WeatherAPI:
             valid_base_times = ['2300', '2000', '1700', '1400', '1100', '0800', '0500', '0200']
 
             # 현재 시각 기준으로 가장 최근 유효 발표 시각 목록 생성 (최대 2일치 시도)
+            now_hhmm = int(now.strftime('%H%M'))
             candidates = []
             for days_back in range(2):
                 check_dt = now - timedelta(days=days_back)
                 for bt in valid_base_times:
+                    # 오늘 날짜면 미래 발표 시각 제외
+                    if days_back == 0 and int(bt) > now_hhmm:
+                        continue
                     candidates.append((check_dt.strftime('%Y%m%d'), bt))
 
             for fcst_date, fcst_time in candidates:
