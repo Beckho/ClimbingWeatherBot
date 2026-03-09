@@ -690,36 +690,60 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     days_to_saturday = (saturday - today).days if saturday else 0
     days_to_sunday = (sunday - today).days if sunday else 0
 
-    # 3일 초과 구간이면 단기예보 데이터가 불완전하므로 버리고 중기예보로 대체
-    if days_to_saturday > 3 and weekend_forecast['saturday']:
-        logger.info(f"[주말 예보] 토요일 D+{days_to_saturday} → 단기예보 {len(weekend_forecast['saturday'])}개 제거 후 중기로 대체")
-        weekend_forecast['saturday'] = []
-    if days_to_sunday > 3 and weekend_forecast['sunday']:
-        logger.info(f"[주말 예보] 일요일 D+{days_to_sunday} → 단기예보 {len(weekend_forecast['sunday'])}개 제거 후 중기로 대체")
-        weekend_forecast['sunday'] = []
-
-    need_midterm_sat = bool(saturday and len(weekend_forecast['saturday']) == 0 and days_to_saturday > 3)
-    need_midterm_sun = bool(sunday and len(weekend_forecast['sunday']) == 0 and days_to_sunday > 3)
+    need_midterm_sat = bool(saturday and days_to_saturday > 3)
+    need_midterm_sun = bool(sunday and days_to_sunday > 3)
     need_midterm_this_week = need_midterm_sat or need_midterm_sun
 
     if region and kma_key and (is_weekend_today or need_midterm_this_week):
         midterm_data = weather_api.get_kma_midterm_forecast(region)
         if midterm_data:
+            # 날짜별 중기예보 맵 생성
+            midterm_by_date = {}
             for fc in midterm_data.get('forecast', []):
                 try:
                     fc_date = datetime.fromisoformat(fc['timestamp']).astimezone(seoul_tz).date()
-                    if need_midterm_sat and saturday and fc_date == saturday:
-                        weekend_forecast['saturday'].append(fc)
-                    if need_midterm_sun and sunday and fc_date == sunday:
-                        weekend_forecast['sunday'].append(fc)
-                    if is_weekend_today:
-                        if next_saturday and fc_date == next_saturday:
-                            weekend_forecast['next_saturday'].append(fc)
-                        elif next_sunday and fc_date == next_sunday:
-                            weekend_forecast['next_sunday'].append(fc)
+                    midterm_by_date[fc_date] = fc
                 except Exception as e:
                     logger.warning(f"[KMA 중기] 타임스탬프 파싱 오류: {e}")
-            logger.info(f"[KMA 중기] 이번주 토={len(weekend_forecast['saturday'])}개, 일={len(weekend_forecast['sunday'])}개 / 다음주 토={len(weekend_forecast.get('next_saturday',[]))}개, 일={len(weekend_forecast.get('next_sunday',[]))}개")
+
+            def merge_with_midterm(short_items, midterm_fc):
+                """단기예보(풍속/날씨) + 중기예보(최저/최고온도) 합성"""
+                if short_items and midterm_fc:
+                    avg_wind = sum(item.get('wind_speed', 0) for item in short_items) / len(short_items)
+                    desc = short_items[0].get('description', midterm_fc.get('description', ''))
+                    return [{
+                        'temp_min': midterm_fc.get('temp_min', 0),
+                        'temp_max': midterm_fc.get('temp_max', 0),
+                        'temp': midterm_fc.get('temp', 0),
+                        'wind_speed': avg_wind,
+                        'rain_prob': midterm_fc.get('rain_prob', 0),
+                        'description': desc,
+                        'timestamp': midterm_fc.get('timestamp', ''),
+                    }]
+                elif midterm_fc:
+                    return [midterm_fc]
+                else:
+                    return short_items
+
+            if need_midterm_sat and saturday and saturday in midterm_by_date:
+                weekend_forecast['saturday'] = merge_with_midterm(
+                    weekend_forecast['saturday'], midterm_by_date[saturday]
+                )
+            if need_midterm_sun and sunday and sunday in midterm_by_date:
+                weekend_forecast['sunday'] = merge_with_midterm(
+                    weekend_forecast['sunday'], midterm_by_date[sunday]
+                )
+            if is_weekend_today:
+                if next_saturday and next_saturday in midterm_by_date:
+                    weekend_forecast['next_saturday'] = merge_with_midterm(
+                        weekend_forecast.get('next_saturday', []), midterm_by_date[next_saturday]
+                    )
+                if next_sunday and next_sunday in midterm_by_date:
+                    weekend_forecast['next_sunday'] = merge_with_midterm(
+                        weekend_forecast.get('next_sunday', []), midterm_by_date[next_sunday]
+                    )
+
+            logger.info(f"[KMA 중기 합성] 이번주 토={len(weekend_forecast['saturday'])}개, 일={len(weekend_forecast['sunday'])}개 / 다음주 토={len(weekend_forecast.get('next_saturday',[]))}개, 일={len(weekend_forecast.get('next_sunday',[]))}개")
 
     # 캐시 저장
     _forecast_cache[cache_key] = (time.time(), weekend_forecast)
