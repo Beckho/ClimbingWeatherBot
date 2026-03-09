@@ -469,8 +469,7 @@ class ClimbingWeatherBot:
                         min_t, max_t, wind, weather_icon = data_dict[sname]
                         wind_str = "--" if wind == 0.0 else f"{wind:.1f}m/s"
                         try:
-                            avg_temp = (float(min_t) + float(max_t)) / 2
-                            wd_data = {'temp': avg_temp, 'wind_speed': wind * 3.6}
+                            wd_data = {'temp': float(max_t), 'wind_speed': wind * 3.6}
                             _, rating, _ = WeatherAnalyzer.calculate_suitability(wd_data)
                             suit_emoji = WeatherAnalyzer.get_rating_emoji(rating)
                         except Exception:
