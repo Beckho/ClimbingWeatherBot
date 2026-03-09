@@ -404,8 +404,16 @@ class ClimbingWeatherBot:
 
                 # 지역별 데이터 저장 (최저/최고 온도, 평균 바람(m/s), 날씨 아이콘)
                 def summarize(items):
-                    min_temp = min(item.get('temp_min', float('inf')) for item in items)
-                    max_temp = max(item.get('temp_max', float('-inf')) for item in items)
+                    # 중기예보: 날짜당 1개 item, temp_min/max에 실제 최저/최고
+                    # 단기예보: 3시간 단위 여러 item, temp_min == temp_max == temp(순간기온)
+                    if len(items) == 1:
+                        item = items[0]
+                        min_temp = item.get('temp_min', item.get('temp', 0))
+                        max_temp = item.get('temp_max', item.get('temp', 0))
+                    else:
+                        temps = [item.get('temp', 0) for item in items]
+                        min_temp = min(temps)
+                        max_temp = max(temps)
                     avg_wind = sum(item.get('wind_speed', 0) for item in items) / len(items)
                     descriptions = [item.get('description', '') for item in items]
                     icon = get_weather_icon(descriptions[0] if descriptions else '')

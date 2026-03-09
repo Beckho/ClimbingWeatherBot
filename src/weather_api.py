@@ -688,7 +688,10 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
     # 1) 오늘이 주말 → 다음 주 토/일 채우기
     # 2) 이번 주 토/일이 단기예보 범위(3일) 초과 → 이번 주 토/일도 중기예보로 채우기
     days_to_saturday = (saturday - today).days if saturday else 0
-    need_midterm_this_week = saturday and len(weekend_forecast['saturday']) == 0 and days_to_saturday > 3
+    days_to_sunday = (sunday - today).days if sunday else 0
+    need_midterm_sat = bool(saturday and len(weekend_forecast['saturday']) == 0 and days_to_saturday > 3)
+    need_midterm_sun = bool(sunday and len(weekend_forecast['sunday']) == 0 and days_to_sunday > 3)
+    need_midterm_this_week = need_midterm_sat or need_midterm_sun
 
     if region and kma_key and (is_weekend_today or need_midterm_this_week):
         midterm_data = weather_api.get_kma_midterm_forecast(region)
@@ -696,11 +699,10 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
             for fc in midterm_data.get('forecast', []):
                 try:
                     fc_date = datetime.fromisoformat(fc['timestamp']).astimezone(seoul_tz).date()
-                    if need_midterm_this_week:
-                        if saturday and fc_date == saturday:
-                            weekend_forecast['saturday'].append(fc)
-                        elif sunday and fc_date == sunday:
-                            weekend_forecast['sunday'].append(fc)
+                    if need_midterm_sat and saturday and fc_date == saturday:
+                        weekend_forecast['saturday'].append(fc)
+                    if need_midterm_sun and sunday and fc_date == sunday:
+                        weekend_forecast['sunday'].append(fc)
                     if is_weekend_today:
                         if next_saturday and fc_date == next_saturday:
                             weekend_forecast['next_saturday'].append(fc)
