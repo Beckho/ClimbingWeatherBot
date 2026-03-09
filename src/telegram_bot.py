@@ -454,7 +454,7 @@ class ClimbingWeatherBot:
                 COL_NAME = 15  # 삼천바위(완주)(표시너비 14) + 여백 1
                 COL_TEMP = 9   # 최대 -5~-2°C (8자)
                 COL_WIND = 8   # 최대 10.5m/s (7자)
-                sec += ljust_dw("지역", COL_NAME) + ljust_dw("온도", COL_TEMP) + ljust_dw("풍속", COL_WIND) + "날씨 ★\n"
+                sec += ljust_dw("지역", COL_NAME) + ljust_dw("온도", COL_TEMP) + ljust_dw("풍속", COL_WIND) + "날씨 적합\n"
                 sec += "-" * (COL_NAME + COL_TEMP + COL_WIND + 2) + "\n"
                 if data_dict:
                     for sname in sorted(data_dict.keys()):

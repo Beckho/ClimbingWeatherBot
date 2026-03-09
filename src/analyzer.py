@@ -15,10 +15,13 @@ class WeatherAnalyzer:
     # 클라이밍 적합도 기준
     CRITERIA = {
         'wind_speed_max': 30,      # km/h
-        'temp_min': 5,             # °C
-        'temp_max': 30,            # °C
-        'rain_threshold': 3.0,     # mm
-        'humidity_max': 80,        # %
+        'temp_optimal_min': 15,    # °C (최적 온도 하한)
+        'temp_optimal_max': 25,    # °C (최적 온도 상한)
+        'temp_cold_threshold': 10, # °C (이 이하부터 급격한 패널티)
+        'temp_hot_threshold': 30,  # °C (이 이상부터 급격한 패널티)
+        'rain_threshold': 1.0,     # mm
+        'humidity_max': 75,        # %
+        'rain_prob_threshold': 30, # %
         'pm25_max': 35             # μg/m³
     }
     
@@ -38,35 +41,46 @@ class WeatherAnalyzer:
         
         score = 100
         penalties = {}
-        
-        # 온도 평가
+
+        # 온도 평가 (최적: 15~25°C)
         temp = weather_data.get('temp')
         if temp is not None:
-            if temp < criteria['temp_min']:
-                penalties['too_cold'] = (criteria['temp_min'] - temp) * 5
-            elif temp > criteria['temp_max']:
-                penalties['too_hot'] = (temp - criteria['temp_max']) * 3
-        
+            opt_min = criteria.get('temp_optimal_min', 15)
+            opt_max = criteria.get('temp_optimal_max', 25)
+            cold_thr = criteria.get('temp_cold_threshold', 10)
+            hot_thr = criteria.get('temp_hot_threshold', 30)
+            if temp < cold_thr:
+                penalties['too_cold'] = 25 + (cold_thr - temp) * 12
+            elif temp < opt_min:
+                penalties['too_cold'] = (opt_min - temp) * 5
+            elif temp > hot_thr:
+                penalties['too_hot'] = 25 + (temp - hot_thr) * 10
+            elif temp > opt_max:
+                penalties['too_hot'] = (temp - opt_max) * 5
+
         # 바람 평가
         wind = weather_data.get('wind_speed')
         if wind is not None:
             if wind > criteria['wind_speed_max']:
                 penalties['too_windy'] = (wind - criteria['wind_speed_max']) * 2
-        
+
         # 강수량 평가
         rain = weather_data.get('rain_1h', 0)
-        if rain > criteria['rain_threshold']:
-            penalties['rain'] = (rain - criteria['rain_threshold']) * 10
-        
+        rain_thr = criteria.get('rain_threshold', 1.0)
+        if rain > rain_thr:
+            penalties['rain'] = (rain - rain_thr) * 15
+
         # 습도 평가
         humidity = weather_data.get('humidity')
-        if humidity and humidity > criteria['humidity_max']:
-            penalties['humidity'] = (humidity - criteria['humidity_max']) * 0.3
-        
+        hum_max = criteria.get('humidity_max', 75)
+        if humidity and humidity > hum_max:
+            penalties['humidity'] = (humidity - hum_max) * 3.0
+
         # 강수 확률 평가 (예보)
         rain_prob = weather_data.get('rain_prob', 0)
-        if rain_prob > 50:
-            penalties['rain_probability'] = (rain_prob - 50) * 0.5
+        rain_prob_thr = criteria.get('rain_prob_threshold', 30)
+        if rain_prob > rain_prob_thr:
+            penalties['rain_probability'] = (rain_prob - rain_prob_thr) * 1.0
         
         # 점수 계산
         for penalty in penalties.values():
