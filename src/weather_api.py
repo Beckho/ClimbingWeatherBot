@@ -529,8 +529,15 @@ class WeatherAPI:
                     rain_prob = land_item.get(f'rnSt{d}', 0)
                     weather = land_item.get(f'wf{d}', '')
 
-                temp_min = ta_item.get(f'taMin{d}', 0)
-                temp_max = ta_item.get(f'taMax{d}', 0)
+                temp_min = ta_item.get(f'taMin{d}')
+                temp_max = ta_item.get(f'taMax{d}')
+                logger.debug(f"[KMA 중기] d={d} ({fcst_date}): taMin{d}={temp_min}, taMax{d}={temp_max}")
+                # None이면 해당 날짜 데이터 없음 → 건너뜀
+                if temp_min is None or temp_max is None:
+                    logger.info(f"[KMA 중기] d={d} ({fcst_date}) 온도 데이터 없음, 건너뜀")
+                    continue
+                temp_min = int(temp_min)
+                temp_max = int(temp_max)
 
                 forecast.append({
                     'timestamp': datetime.combine(fcst_date, datetime.min.time()).replace(tzinfo=seoul_tz).isoformat(),
@@ -715,10 +722,18 @@ def get_weekend_forecast(lat: float, lon: float, openweather_key: str, kma_key: 
                 if short_items and midterm_fc:
                     avg_wind = sum(item.get('wind_speed', 0) for item in short_items) / len(short_items)
                     desc = short_items[0].get('description', midterm_fc.get('description', ''))
+                    t_min = midterm_fc.get('temp_min', 0)
+                    t_max = midterm_fc.get('temp_max', 0)
+                    # 중기예보 온도가 둘 다 0이면 단기예보 온도 사용
+                    if t_min == 0 and t_max == 0:
+                        short_temps = [item.get('temp', 0) for item in short_items]
+                        t_min = min(short_temps)
+                        t_max = max(short_temps)
+                        logger.info(f"[KMA 중기] 온도 0~0 → 단기예보 온도로 대체: {t_min}~{t_max}")
                     return [{
-                        'temp_min': midterm_fc.get('temp_min', 0),
-                        'temp_max': midterm_fc.get('temp_max', 0),
-                        'temp': midterm_fc.get('temp', 0),
+                        'temp_min': t_min,
+                        'temp_max': t_max,
+                        'temp': (t_min + t_max) / 2,
                         'wind_speed': avg_wind,
                         'rain_prob': midterm_fc.get('rain_prob', 0),
                         'description': desc,
