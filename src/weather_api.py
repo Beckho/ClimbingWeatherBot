@@ -420,6 +420,7 @@ class WeatherAPI:
             '경상남도': '11H20000',
             '부산':     '11H20000',
             '울산':     '11H20000',
+            '제주':     '11G00000',
         }
         # 중기기온조회 지역 코드 (getMidTa)
         ta_reg_map = {
@@ -435,6 +436,7 @@ class WeatherAPI:
             '경상남도': '11H20101',  # 창원
             '부산':     '11H20201',
             '울산':     '11H20301',
+            '제주':     '11G00401',
         }
 
         land_reg_id = land_reg_map.get(region)
