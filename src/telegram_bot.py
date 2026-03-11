@@ -99,15 +99,15 @@ class ClimbingWeatherBot:
 3. /sites - 등록된 모든 지역의 상세 정보
 4. /help - 이 도움말
 
-🏔️ **모니터링 지역 (14개)**
+🏔️ **모니터링 지역 (15개)**
 
-*스포츠 클라이밍 (8개)*
+*스포츠 클라이밍 (9개)*
 • 간현(원주) • 조비산(용인) • 선운산(고창)
 • 삼성산(안양) • 삼천바위(완주)
-• 연경(대구) • 새벽암장(파주) • 무수천(제주)
+• 연경(대구) • 새벽암장(파주) • 북한산(서울) • 무수천(제주)
 
 *볼더링 (6개)*
-• 진안(진안) • 무등산(광주) • 북한산(서울)
+• 진안(진안) • 무등산(광주) • 내원사(양산)
 • 불암산(노원) • 감자바위(안양) • 을왕리(인천)
 
 💬 **자연스러운 말로도 사용 가능:**
@@ -479,8 +479,10 @@ class ClimbingWeatherBot:
                 COL_WIND = 8   # 최대 10.5m/s (7자)
                 sec += ljust_dw("지역", COL_NAME) + ljust_dw("온도", COL_TEMP) + ljust_dw("풍속", COL_WIND) + "날씨 적합\n"
                 sec += "-" * (COL_NAME + COL_TEMP + COL_WIND + 2) + "\n"
-                if data_dict:
-                    for sname in sorted(data_dict.keys()):
+
+                def render_rows(names):
+                    rows = ""
+                    for sname in sorted(names):
                         min_t, max_t, wind, weather_icon = data_dict[sname]
                         wind_str = "--" if wind == 0.0 else f"{wind:.1f}m/s"
                         try:
@@ -490,7 +492,25 @@ class ClimbingWeatherBot:
                         except Exception:
                             suit_emoji = "❓"
                         temp_str = f"{min_t}~{max_t}°C"
-                        sec += ljust_dw(sname, COL_NAME) + ljust_dw(temp_str, COL_TEMP) + ljust_dw(wind_str, COL_WIND) + weather_icon + suit_emoji + "\n"
+                        rows += ljust_dw(sname, COL_NAME) + ljust_dw(temp_str, COL_TEMP) + ljust_dw(wind_str, COL_WIND) + weather_icon + suit_emoji + "\n"
+                    return rows
+
+                if data_dict:
+                    # 타입별 분류 (sites 정보 참조)
+                    lead_names = [n for n in data_dict if self.sites.get(n, {}).get('type') == '스포츠 클라이밍']
+                    boulder_names = [n for n in data_dict if self.sites.get(n, {}).get('type') == '볼더링']
+                    other_names = [n for n in data_dict if n not in lead_names and n not in boulder_names]
+
+                    if lead_names:
+                        sec += "[ 리드 ]\n"
+                        sec += render_rows(lead_names)
+                    if boulder_names:
+                        if lead_names:
+                            sec += "\n"
+                        sec += "[ 볼더링 ]\n"
+                        sec += render_rows(boulder_names)
+                    if other_names:
+                        sec += render_rows(other_names)
                 else:
                     sec += "데이터 없음 (예보 범위 초과)\n"
                 sec += "```\n"

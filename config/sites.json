@@ -68,7 +68,7 @@
       "latitude": 37.6524,
       "longitude": 126.9753,
       "region": "서울",
-      "type": "볼더링"
+      "type": "스포츠 클라이밍"
     },
     {
       "name": "불암산(노원)",
@@ -89,6 +89,13 @@
       "latitude": 37.4167,
       "longitude": 126.4167,
       "region": "인천",
+      "type": "볼더링"
+    },
+    {
+      "name": "내원사(양산)",
+      "latitude": 35.4500,
+      "longitude": 129.0200,
+      "region": "경상남도",
       "type": "볼더링"
     },
     {
