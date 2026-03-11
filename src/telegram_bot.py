@@ -411,19 +411,28 @@ class ClimbingWeatherBot:
                 # 지역별 데이터 저장 (최저/최고 온도, 평균 바람(m/s), 날씨 아이콘)
                 def summarize(items):
                     # 중기예보: 날짜당 1개 item, temp_min/max에 실제 최저/최고
-                    # 단기예보: 3시간 단위 여러 item, temp_min == temp_max == temp(순간기온)
+                    # 단기예보: 3시간 단위 여러 item, TMX/TMN 카테고리 우선 사용
                     if len(items) == 1:
                         item = items[0]
                         min_temp = item.get('temp_min', item.get('temp', 0))
                         max_temp = item.get('temp_max', item.get('temp', 0))
                     else:
+                        # TMX/TMN(일 최고/최저기온) 카테고리가 있으면 우선 사용
+                        tmx_vals = [item['tmx'] for item in items if item.get('tmx') is not None]
+                        tmn_vals = [item['tmn'] for item in items if item.get('tmn') is not None]
                         temps = [item.get('temp', 0) for item in items]
-                        min_temp = min(temps)
-                        max_temp = max(temps)
-                    avg_wind = sum(item.get('wind_speed', 0) for item in items) / len(items)
+                        max_temp = max(tmx_vals) if tmx_vals else max(temps)
+                        min_temp = min(tmn_vals) if tmn_vals else min(temps)
+                    # 클라이밍 시간대(11~17시) 최대 풍속, 없으면 전체 최대
+                    climbing_items = [
+                        item for item in items
+                        if 11 <= datetime.fromisoformat(item.get('timestamp', '1970-01-01T00:00:00')).hour < 17
+                    ]
+                    wind_items = climbing_items if climbing_items else items
+                    max_wind = max(item.get('wind_speed', 0) for item in wind_items)
                     descriptions = [item.get('description', '') for item in items]
                     icon = get_weather_icon(descriptions[0] if descriptions else '')
-                    return (f"{min_temp:.0f}", f"{max_temp:.0f}", avg_wind, icon)
+                    return (f"{min_temp:.0f}", f"{max_temp:.0f}", max_wind, icon)
 
                 if saturday:
                     saturday_data[site_name] = summarize(saturday)
@@ -446,7 +455,7 @@ class ClimbingWeatherBot:
 
             # 메시지 구성
             message = f"🗓️ *[ 주말 날씨 예보 ]* ({source_emoji}{announced_str})\n"
-            message += "최저/최고 온도 & 평균 풍속 (5일 이내)\n"
+            message += "최저/최고 온도 & 평균 풍속\n"
             message += "=" * 60 + "\n\n"
 
             def dw(s):

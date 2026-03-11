@@ -350,11 +350,15 @@ class WeatherAPI:
                     dt_kst = seoul_tz.localize(datetime.strptime(dt_str, '%Y%m%d%H%M'))
                     
                     # 카테고리에서 필요한 값 추출
+                    tmx = categories.get('TMX')
+                    tmn = categories.get('TMN')
                     forecast.append({
                         'timestamp': dt_kst.isoformat(),
                         'temp': categories.get('TMP', 0),  # 기온
                         'temp_min': categories.get('TMP', 0),
                         'temp_max': categories.get('TMP', 0),
+                        'tmx': tmx,  # 일 최고기온 (해당 슬롯에만 존재)
+                        'tmn': tmn,  # 일 최저기온 (해당 슬롯에만 존재)
                         'humidity': categories.get('REH', 0),  # 습도
                         'wind_speed': categories.get('WSD', 0),  # 풍속 (이미 m/s)
                         'rain_prob': categories.get('POP', 0),  # 강수확률
